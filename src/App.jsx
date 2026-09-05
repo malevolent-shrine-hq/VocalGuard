@@ -12,36 +12,76 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
-  const [backendStatus, setBackendStatus] = useState({ online: false, checking: true, data: null });
+  const [backendStatus, setBackendStatus] = useState({ 
+    online: false, 
+    checking: true, 
+    data: null,
+    latencyMs: null,
+    lastChecked: null 
+  });
 
-  const checkHealth = useCallback(() => {
-    fetch(`${API_BASE}/api/health`)
+  const isOnlineRef = useRef(false);
+  const isCheckingRef = useRef(false);
+
+  useEffect(() => {
+    isOnlineRef.current = backendStatus.online;
+    isCheckingRef.current = backendStatus.checking;
+  }, [backendStatus.online, backendStatus.checking]);
+
+  const pingHealth = useCallback((setChecking = false) => {
+    if (setChecking) {
+      setBackendStatus(s => ({ ...s, checking: true }));
+    }
+    const startTime = performance.now();
+    return fetch(`${API_BASE}/api/health?_t=${Date.now()}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
-      .then(data => setBackendStatus({ online: true, checking: false, data }))
-      .catch(() => setBackendStatus({ online: false, checking: false, data: null }));
+      .then(data => {
+        const latency = Math.round(performance.now() - startTime);
+        setBackendStatus({ 
+          online: true, 
+          checking: false, 
+          data, 
+          latencyMs: latency,
+          lastChecked: new Date() 
+        });
+      })
+      .catch(() => {
+        setBackendStatus(prev => ({ 
+          ...prev, 
+          online: false, 
+          checking: false, 
+          latencyMs: null,
+          lastChecked: new Date() 
+        }));
+      });
   }, []);
 
   const handleManualRetry = () => {
-    setBackendStatus(s => ({ ...s, checking: true }));
-    checkHealth();
+    pingHealth(true);
   };
 
   useEffect(() => {
-    checkHealth();
-    // Auto-poll health every 8 seconds if offline (vital for Render free-tier cold starts)
+    let cancelled = false;
+    const runCheck = () => {
+      if (!cancelled) pingHealth(false);
+    };
+
+    runCheck();
+    // Auto-poll health every 5 seconds if offline or checking (vital for Render free-tier cold starts)
     const interval = setInterval(() => {
-      setBackendStatus(prev => {
-        if (!prev.online) {
-          checkHealth();
-        }
-        return prev;
-      });
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [checkHealth]);
+      if (!isOnlineRef.current || isCheckingRef.current) {
+        runCheck();
+      }
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [pingHealth]);
 
   return (
     <div className="min-h-screen text-[#f5f5f5] selection:bg-[#CCFF00] selection:text-black font-sans relative bg-[#050505] overflow-x-hidden w-full flex flex-col justify-between">
@@ -109,38 +149,42 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-4 md:gap-8 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px] sm:text-[10px] tracking-wider uppercase shrink-0">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${
-              backendStatus.online 
-                ? 'bg-[#CCFF00] animate-pulse' 
-                : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
-            }`} />
-            <span className={
-              backendStatus.online 
-                ? 'text-[#888]' 
-                : (backendStatus.checking ? 'text-amber-400' : 'text-[#FF3333]')
-            }>
-              <span className="hidden sm:inline">
-                {backendStatus.online 
-                  ? 'API ONLINE' 
-                  : (backendStatus.checking ? 'CHECKING API...' : 'API DISCONNECTED')}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px] sm:text-[10px] tracking-wider uppercase shrink-0 px-2 py-1 bg-[#0a0a0a] border border-[#222]">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                backendStatus.online 
+                  ? 'bg-[#CCFF00] animate-pulse' 
+                  : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
+              }`} />
+              <span className={
+                backendStatus.online 
+                  ? 'text-[#888]' 
+                  : (backendStatus.checking ? 'text-amber-400' : 'text-[#FF3333]')
+              }>
+                <span className="hidden sm:inline">
+                  {backendStatus.online 
+                    ? (backendStatus.latencyMs ? `API ONLINE (${backendStatus.latencyMs}ms)` : 'API ONLINE')
+                    : (backendStatus.checking ? 'WAKING API...' : 'API ASLEEP')}
+                </span>
+                <span className="sm:hidden">
+                  {backendStatus.online 
+                    ? 'ONLINE' 
+                    : (backendStatus.checking ? 'WAKING...' : 'OFFLINE')}
+                </span>
               </span>
-              <span className="sm:hidden">
-                {backendStatus.online 
-                  ? 'ONLINE' 
-                  : (backendStatus.checking ? 'CHECKING' : 'OFFLINE')}
+            </div>
+
+            <button 
+              onClick={onRetryBackend}
+              disabled={backendStatus.checking}
+              className="flex items-center gap-1 text-[9px] sm:text-[10px] font-mono text-[#aaa] hover:text-[#CCFF00] uppercase tracking-wider border border-[#333] hover:border-[#CCFF00] px-2 py-1 bg-[#111] transition-all disabled:opacity-50 group shrink-0"
+              title="Ping backend / wake up Render instance (free tier spins down after 15m inactivity)"
+            >
+              <RefreshCw className={`w-3 h-3 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#777] group-hover:text-[#CCFF00]'}`} />
+              <span className="hidden xs:inline font-semibold">
+                {backendStatus.checking ? 'Pinging...' : 'Wake Server'}
               </span>
-            </span>
-            {!backendStatus.online && (
-              <button 
-                onClick={onRetryBackend}
-                disabled={backendStatus.checking}
-                className="ml-1 text-[8px] sm:text-[9px] text-[#CCFF00] hover:underline uppercase tracking-widest border border-[#333] px-1 sm:px-1.5 py-0.5 bg-[#111] disabled:opacity-50"
-                title="Retry connecting to backend"
-              >
-                Retry
-              </button>
-            )}
+            </button>
           </div>
 
           {/* Mobile compact nav buttons */}
@@ -897,24 +941,36 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       {audioUrl && <audio ref={audioRef} src={audioUrl} preload="auto" />}
 
       {!backendStatus.online && !backendStatus.checking && (
-        <div className="mb-4 sm:mb-6 p-3 sm:p-3.5 bg-[#FF3333]/10 border border-[#FF3333] text-[#FF3333] font-mono text-[11px] sm:text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Backend offline: Server might be in cold-start sleep mode (takes ~30s on free tiers).</span>
+        <div className="mb-4 sm:mb-6 p-3.5 bg-[#FF3333]/10 border border-[#FF3333] text-[#FF3333] font-mono text-[11px] sm:text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(255,51,51,0.1)]">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-[#FF3333] mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold text-white uppercase tracking-wider block sm:inline mr-2">Backend Sleeping (Render Free Tier):</span>
+              <span className="text-[#FF9999]">Services spin down automatically after 15 minutes of inactivity. Click 'Wake Server' to request a boot (takes ~30–45s).</span>
+            </div>
           </div>
           <button 
             onClick={onRetryBackend} 
-            className="underline hover:text-white px-2 py-0.5 border border-[#FF3333]/40 bg-black uppercase tracking-wider text-[9px] sm:text-[10px] shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FF3333] hover:bg-white text-black font-bold uppercase tracking-wider text-[10px] sm:text-[11px] transition-colors shrink-0"
           >
-            Reconnect
+            <RefreshCw className="w-3 h-3" />
+            <span>Wake Server Now</span>
           </button>
         </div>
       )}
 
       {backendStatus.checking && (
-        <div className="mb-4 sm:mb-6 p-2.5 sm:p-3 bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-[11px] sm:text-xs flex items-center gap-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-          <span className="truncate">Connecting to VocalGuard neural inference backend...</span>
+        <div className="mb-4 sm:mb-6 p-3.5 bg-amber-400/10 border border-amber-400 text-amber-400 font-mono text-[11px] sm:text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse shadow-[0_0_15px_rgba(251,191,36,0.1)]">
+          <div className="flex items-center gap-2.5">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0 text-amber-400" />
+            <div>
+              <span className="font-bold text-white uppercase tracking-wider block sm:inline mr-2">Pinging Render Gateway:</span>
+              <span className="text-amber-200">Waking up container from 15-minute idle sleep... Initial boot takes ~30–45s. Background auto-polling is active.</span>
+            </div>
+          </div>
+          <span className="text-[10px] bg-black border border-amber-400/50 px-2.5 py-1 text-amber-400 shrink-0 font-bold">
+            CONNECTING...
+          </span>
         </div>
       )}
       
@@ -940,9 +996,29 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           </div>
         </div>
         
-        <div className="w-full md:w-auto flex items-center">
+        <div className="w-full md:w-auto flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+          {/* Quick Ping / Wake Backend Button */}
+          <button
+            onClick={onRetryBackend}
+            disabled={backendStatus.checking}
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-[#111] hover:bg-[#1c1c1c] border border-[#333] hover:border-[#CCFF00] text-white font-mono text-[10px] sm:text-xs uppercase tracking-wider transition-all disabled:opacity-50 shrink-0 w-full sm:w-auto group"
+            title="Render free-tier instances spin down after 15m. Click to ping the backend or wake it up."
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#888] group-hover:text-[#CCFF00]'}`} />
+            <span>
+              {backendStatus.checking 
+                ? 'Waking Server...' 
+                : (backendStatus.online ? 'Ping / Refresh Server' : 'Wake Up Backend')}
+            </span>
+            {backendStatus.online && backendStatus.latencyMs && (
+              <span className="text-[9px] text-[#CCFF00] font-bold px-1 bg-[#CCFF00]/10 border border-[#CCFF00]/30">
+                {backendStatus.latencyMs}ms
+              </span>
+            )}
+          </button>
+
           {/* Status Indicator */}
-          <div className={`flex items-center justify-center gap-2 sm:gap-3 tech-panel px-3 sm:px-4 py-2 bg-black border w-full md:w-auto ${
+          <div className={`flex items-center justify-center gap-2 sm:gap-3 tech-panel px-3 sm:px-4 py-2 bg-black border w-full sm:w-auto ${
             status === 'danger' ? 'border-[#FF3333]' : 
             status === 'safe' ? 'border-[#CCFF00]' : 
             status === 'analyzing' ? 'border-[#CCFF00]' : 'border-[#333]'
