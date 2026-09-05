@@ -12,7 +12,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 # Load environment variables from .env file if present
 load_dotenv()
@@ -105,7 +105,10 @@ def list_samples():
     """
     Provides demo audio samples for instant frontend testing.
     """
-    sample_dir = Path(__file__).parent.parent / "samples"
+    sample_dir = Path(__file__).parent.parent / "public" / "samples"
+    if not sample_dir.exists():
+        sample_dir = Path(__file__).parent.parent / "samples"
+
     samples = []
     if sample_dir.exists():
         for f in sample_dir.glob("*.*"):
@@ -116,6 +119,18 @@ def list_samples():
                     "path": f"/api/samples/{f.name}"
                 })
     return {"samples": samples}
+
+
+@app.get("/api/samples/{filename}")
+def get_sample_file(filename: str):
+    """
+    Serves a specific demo audio sample file.
+    """
+    for base in [Path(__file__).parent.parent / "public" / "samples", Path(__file__).parent.parent / "samples"]:
+        file_path = base / filename
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail=f"Sample '{filename}' not found.")
 
 
 if __name__ == "__main__":

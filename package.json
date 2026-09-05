@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "backend": "backend_venv/bin/uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload",
+    "backend": "venv/bin/uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload",
     "backend:prod": "python3 -m uvicorn api.index:app --host 0.0.0.0 --port 8000"
   },
   "dependencies": {
