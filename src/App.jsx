@@ -1659,30 +1659,30 @@ function AboutPage({ setActiveView }) {
       github: "https://github.com/Bimbok",
       handle: "@Bimbok",
       avatar: "https://avatars.githubusercontent.com/u/132834022?v=4",
-      role: "Lead Deep Learning Architect & Systems Engineer",
-      badge: "ARCHITECTURE & TRAINING",
-      bio: "Engineered and trained the PyTorch Multi-Resolution SE-ResNet (v3) detection core. Formulated the 3-channel STFT representation (1024-Mel vocal tract biology, 512-Linear transient phase tracking, 2048-Linear harmonic pitch overtones). Calibrated the focal loss decision boundary with Youden's J statistic (τ* = 0.0509) to achieve 93.66% accuracy and 98.71% ROC-AUC on the FoR benchmark.",
-      skills: ["PyTorch", "TorchAudio", "DSP & Resampling", "FastAPI", "Model Optimization"]
+      role: "Lead Machine Learning & Backend Engineer",
+      badge: "MODEL & BACKEND ARCHITECTURE",
+      bio: "Co-developed the PyTorch Multi-Resolution SE-ResNet (v3) deep learning model and the backend server architecture alongside Aditya. Formulated the 3-channel STFT representation (1024-Mel formants, 512-Linear temporal transients, 2048-Linear harmonic pitch overtones), focal loss training, and Youden's J calibration (τ* = 0.0509). Co-engineered the high-performance FastAPI inference gateway, polyphase audio resampling pipeline, and production deployment on Render.",
+      skills: ["PyTorch", "Model Architecture", "FastAPI Backend", "DSP Pipelines", "Focal Loss & Calibration"]
     },
     {
       name: "Aditya Paul",
       github: "https://github.com/adityapaul26",
       handle: "@adityapaul26",
       avatar: "https://avatars.githubusercontent.com/u/180437661?v=4",
-      role: "Core Full-Stack Engineer & Interaction Designer",
-      badge: "UI/UX & TELEMETRY SYSTEMS",
-      bio: "Architected the industrial cyber-brutalist operations console and visual telemetry pipeline. Built the client-side binary audio streaming, Web Audio API hooks, and hardware-accelerated 60 FPS HTML5 Canvas waveform telemetry. Developed the responsive mobile layout, real-time stage progress steppers, and diagnostic audit JSON telemetry exporter.",
-      skills: ["React 19", "Vite", "Tailwind CSS", "Web Audio API", "HTML5 Canvas Telemetry"]
+      role: "Machine Learning & Backend Systems Engineer",
+      badge: "MODEL & BACKEND SYSTEMS",
+      bio: "Co-engineered both the PyTorch Multi-Resolution SE-ResNet (v3) deep learning model and the backend server architecture alongside Bimbok. Worked on anisotropic convolutional feature extraction, SE attention blocks, multi-statistic global pooling, and model optimization. Co-built the FastAPI backend inference pipeline, audio tensor streaming endpoints, error-handling telemetry, and server deployment.",
+      skills: ["PyTorch", "Deep Learning", "FastAPI Backend", "Audio Processing", "Model Optimization"]
     },
     {
       name: "Bijan Murma",
       github: "https://github.com/bijanmurmu",
       handle: "@bijanmurmu",
       avatar: "https://avatars.githubusercontent.com/u/73417763?v=4",
-      role: "Forensic ML Researcher & Dataset Specialist",
-      badge: "DATASETS & THREAT MODELING",
-      bio: "Curated, cleansed, and balanced the forensic speech benchmark dataset across genuine human recordings and modern zero-shot neural vocoders (HiFi-GAN, VITS, StyleTTS2, Tortoise). Investigated acoustic phase jitter, spectral tilt anomalies, and prosodic stability. Conducted robustness validation against lossy MP3 compression, downsampling, and environmental noise.",
-      skills: ["Acoustic Forensics", "Dataset Curation", "Threat Modeling", "Adversarial Testing"]
+      role: "Lead Frontend & UI/UX Engineer",
+      badge: "FRONTEND & UI/UX ARCHITECTURE",
+      bio: "Architected and engineered the complete frontend web application and interactive user experience for VocalGuard. Designed the industrial cyber-brutalist operations console, 60 FPS HTML5 Canvas real-time audio waveform telemetry, and responsive mobile-optimized layouts. Integrated the Web Audio API microphone capture, multi-stage analysis progress steppers, and client-side communication with the backend inference gateway.",
+      skills: ["React 19", "Vite", "Tailwind CSS", "HTML5 Canvas Telemetry", "Web Audio API", "UI/UX Architecture"]
     }
   ];
 
@@ -2066,7 +2066,7 @@ function Footer({ activeView, setActiveView, backendStatus }) {
                       Bimbok Mukherjee
                     </div>
                     <div className="text-[10px] text-[#666] font-mono truncate">
-                      Lead Architect & ML
+                      Model & Backend Systems
                     </div>
                   </div>
                 </div>
@@ -2090,7 +2090,7 @@ function Footer({ activeView, setActiveView, backendStatus }) {
                       Aditya Paul
                     </div>
                     <div className="text-[10px] text-[#666] font-mono truncate">
-                      Full-Stack & Telemetry
+                      Model & Backend Systems
                     </div>
                   </div>
                 </div>
@@ -2114,7 +2114,7 @@ function Footer({ activeView, setActiveView, backendStatus }) {
                       Bijan Murma
                     </div>
                     <div className="text-[10px] text-[#666] font-mono truncate">
-                      Forensic ML Researcher
+                      Frontend & UI/UX Systems
                     </div>
                   </div>
                 </div>
