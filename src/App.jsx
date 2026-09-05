@@ -491,13 +491,22 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
     return () => el.removeEventListener('ended', onEnded);
   }, [audioUrl]);
 
-  // Clean up audio blob URL and timers on change/unmount
+  // Clean up component timers and abort in-flight XHR on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(stageTimer1Ref.current);
+      clearTimeout(stageTimer2Ref.current);
+      if (xhrRef.current) {
+        xhrRef.current.abort();
+        xhrRef.current = null;
+      }
+    };
+  }, []);
+
+  // Revoke previous audio blob URL when a new one is set or on unmount
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
-      clearTimeout(stageTimer1Ref.current);
-      clearTimeout(stageTimer2Ref.current);
-      if (xhrRef.current) xhrRef.current.abort();
     };
   }, [audioUrl]);
 
@@ -512,7 +521,6 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
     setIsTerminalCollapsed(false);
 
     // Create playable audio preview
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
     const newAudioUrl = URL.createObjectURL(fileOrBlob);
     setAudioUrl(newAudioUrl);
 
