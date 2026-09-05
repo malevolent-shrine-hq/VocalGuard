@@ -96,7 +96,7 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
             Vocal<span className="text-[#888888] font-light">Guard</span>
           </span>
           <span className="hidden lg:inline-block font-mono text-[9px] bg-[#111] text-[#888] border border-[#222] px-2 py-0.5">
-            MODEL: v3-MULTI-RES-CNN
+            MODEL: MULTI-RES-SE-RESNET-v3 (93.66% ACC)
           </span>
         </div>
         
@@ -199,7 +199,7 @@ function LandingPage({ setActiveView }) {
         <div className="lg:col-span-7 space-y-6 sm:space-y-8">
           <div className="flex items-center gap-2 sm:gap-3 font-mono text-[10px] sm:text-xs text-[#CCFF00] tracking-widest uppercase">
             <span className="w-2 h-2 bg-[#CCFF00] animate-pulse shrink-0" />
-            <span className="truncate">PyTorch Multi-Domain Spectrogram CNN // Online</span>
+            <span className="truncate">PyTorch Multi-Resolution SE-ResNet (v3) // Online</span>
           </div>
           
           <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter leading-[1.05] uppercase text-white">
@@ -209,7 +209,7 @@ function LandingPage({ setActiveView }) {
           </h1>
           
           <p className="text-[#888888] text-base sm:text-lg max-w-xl leading-relaxed">
-            Stop synthetic voice fraud before authorization. Our PyTorch multi-resolution spectrogram neural network detects high-frequency neural vocoder artifacts, prosodic phase shifts, and AI text-to-speech clones in milliseconds.
+            Stop synthetic voice fraud before authorization. Powered by PyTorch, VocalGuard's 3-channel Multi-Resolution STFT and Time-Frequency SE-ResNet inspect phonetic formants, vocoder phase shifts, and acoustic artifacts with 93.66% test accuracy and 98.71% ROC-AUC.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
@@ -223,26 +223,55 @@ function LandingPage({ setActiveView }) {
         </div>
         
         {/* Right Side: Neural Flow Widget */}
-        <div className="lg:col-span-5 h-[340px] sm:h-[420px] lg:h-[500px] w-full overflow-hidden">
+        <div className="lg:col-span-5 h-[360px] sm:h-[420px] lg:h-[480px] w-full overflow-hidden">
           <NeuralWidget />
         </div>
       </div>
 
+      {/* Official Benchmark Metrics Ribbon */}
+      <div className="mt-12 sm:mt-16 p-4 sm:p-6 bg-black border border-[#1f1f1f] grid grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6 font-mono">
+        <div className="border-l-2 border-[#CCFF00] pl-3">
+          <div className="text-[10px] text-[#888] uppercase tracking-wider">Test Accuracy</div>
+          <div className="text-2xl sm:text-3xl font-bold text-white mt-0.5">93.66%</div>
+          <div className="text-[9px] text-[#666] mt-0.5">FoR Official Test Split</div>
+        </div>
+        <div className="border-l-2 border-[#CCFF00] pl-3">
+          <div className="text-[10px] text-[#888] uppercase tracking-wider">ROC-AUC</div>
+          <div className="text-2xl sm:text-3xl font-bold text-[#CCFF00] mt-0.5">98.71%</div>
+          <div className="text-[9px] text-[#666] mt-0.5">Class Separability</div>
+        </div>
+        <div className="border-l-2 border-[#333] pl-3">
+          <div className="text-[10px] text-[#888] uppercase tracking-wider">Equal Error Rate</div>
+          <div className="text-2xl sm:text-3xl font-bold text-white mt-0.5">6.34%</div>
+          <div className="text-[9px] text-[#666] mt-0.5">EER (FAR = FRR)</div>
+        </div>
+        <div className="border-l-2 border-[#333] pl-3">
+          <div className="text-[10px] text-[#888] uppercase tracking-wider">Deepfake Recall</div>
+          <div className="text-2xl sm:text-3xl font-bold text-white mt-0.5">93.57%</div>
+          <div className="text-[9px] text-[#666] mt-0.5">509 of 544 Caught</div>
+        </div>
+        <div className="border-l-2 border-[#333] pl-3 col-span-2 md:col-span-1">
+          <div className="text-[10px] text-[#888] uppercase tracking-wider">Decision Boundary</div>
+          <div className="text-2xl sm:text-3xl font-bold text-white mt-0.5">0.0509</div>
+          <div className="text-[9px] text-[#666] mt-0.5">Youden's J Calibrated</div>
+        </div>
+      </div>
+
       {/* Grid Features */}
-      <div className="grid md:grid-cols-3 gap-0 mt-16 sm:mt-32 border border-[#1f1f1f] bg-black">
+      <div className="grid md:grid-cols-3 gap-0 mt-8 sm:mt-12 border border-[#1f1f1f] bg-black">
         <GridFeature 
-          title="Multi-STFT Spectrograms" 
-          desc="Combines 512, 1024, and 2048 STFT windows into a 3-channel feature map to expose neural vocoder phase discrepancies."
+          title="3-Channel Multi-Resolution STFT" 
+          desc="Decomposes raw audio into 3 parallel time-frequency channels: 1024-Mel (vocal tract formants), 512-Linear (fast temporal phase transients), and 2048-Linear (pitch overtone harmonics), capturing micro-cues single-window models smudge."
           number="01"
         />
         <GridFeature 
-          title="Trained Deepfake Model" 
-          desc="Calibrated against deepfake speech models (HiFi-GAN, MelGAN, VITS, ElevenLabs) with optimal 0.0509 decision boundary."
+          title="Anisotropic SE-ResNet Backbone" 
+          desc="Engineered with alternating (5x3 & 3x5) asymmetric convolutions and Squeeze-and-Excitation channel attention to isolate neural vocoder upsampling checkerboards while dampening acoustic room noise."
           number="02"
         />
         <GridFeature 
-          title="Sub-50ms Inference" 
-          desc="Sliding window chunking with PyTorch inference engine delivers ultra-low latency verdict for any audio format."
+          title="768-D Multi-Stat Pooling & Calibration" 
+          desc="Extracts Global Mean, StdDev, and Adaptive Max pooling to intercept fleeting 20ms synthetic glitches, calibrated via Youden's J statistic to an optimal 0.0509 decision boundary."
           number="03"
         />
       </div>
@@ -252,10 +281,10 @@ function LandingPage({ setActiveView }) {
 
 function GridFeature({ title, desc, number }) {
   return (
-    <div className="p-8 border-r border-b md:border-b-0 border-[#1f1f1f] hover:bg-[#050505] transition-colors group">
-      <div className="font-mono text-4xl text-[#1f1f1f] group-hover:text-[#555] transition-colors mb-6">{number}</div>
-      <h3 className="text-xl font-bold uppercase tracking-tight mb-3 text-white">{title}</h3>
-      <p className="text-[#888888] leading-relaxed text-sm">{desc}</p>
+    <div className="p-6 sm:p-8 border-r border-b md:border-b-0 border-[#1f1f1f] hover:bg-[#050505] transition-colors group">
+      <div className="font-mono text-3xl sm:text-4xl text-[#1f1f1f] group-hover:text-[#555] transition-colors mb-4 sm:mb-6">{number}</div>
+      <h3 className="text-lg sm:text-xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">{title}</h3>
+      <p className="text-[#888888] leading-relaxed text-xs sm:text-sm">{desc}</p>
     </div>
   );
 }
@@ -266,60 +295,92 @@ function GridFeature({ title, desc, number }) {
 function NeuralWidget() {
   return (
     <div className="tech-panel p-1 relative flex flex-col h-full w-full bg-black">
-      <div className="flex justify-between items-center px-4 py-3 border-b border-[#1f1f1f] bg-[#0a0a0a]">
-        <span className="font-mono text-[10px] text-[#CCFF00] tracking-widest uppercase">
-          [ NEURAL_PIPELINE: ACTIVE_INFERENCE ]
+      <div className="flex justify-between items-center px-4 py-2.5 border-b border-[#1f1f1f] bg-[#0a0a0a]">
+        <span className="font-mono text-[10px] text-[#CCFF00] tracking-widest uppercase truncate">
+          [ FORENSIC_PIPELINE: MULTI_RES_SE_RESNET_v3 ]
         </span>
-        <span className="font-mono text-[10px] text-[#888888] tracking-widest uppercase">
-          TGT: MULTI_RES_CNN
+        <span className="font-mono text-[10px] text-[#888888] tracking-widest uppercase shrink-0">
+          93.66% ACC
         </span>
       </div>
       <div className="flex-1 bg-black p-2 relative flex items-center justify-center overflow-hidden">
-         <svg className="w-full h-full" viewBox="0 0 500 400" preserveAspectRatio="xMidYMid meet">
+         <svg className="w-full h-full" viewBox="0 0 520 400" preserveAspectRatio="xMidYMid meet">
            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#111" strokeWidth="1"/>
            </pattern>
-           <rect width="500" height="400" fill="url(#grid)" />
+           <rect width="520" height="400" fill="url(#grid)" />
 
-           <g fill="transparent" stroke="#333" strokeWidth="2" strokeDasharray="4,4">
-             <path d="M 60 200 Q 150 100, 220 100" />
-             <path d="M 60 200 Q 150 300, 220 300" />
-             <path d="M 220 100 Q 300 100, 360 200" />
-             <path d="M 220 300 Q 300 300, 360 200" />
-             <path d="M 360 200 L 450 200" strokeDasharray="none" stroke="#555" />
+           {/* Branching paths from Audio In to 3 STFT Channels */}
+           <g fill="transparent" stroke="#2a2a2a" strokeWidth="1.5" strokeDasharray="4,4">
+             <path d="M 45 200 C 90 200, 110 80, 165 80" />
+             <path d="M 45 200 L 165 200" />
+             <path d="M 45 200 C 90 200, 110 320, 165 320" />
+             
+             {/* Paths from 3 STFT Channels into SE-ResNet Backbone */}
+             <path d="M 165 80 C 220 80, 240 200, 295 200" />
+             <path d="M 165 200 L 295 200" />
+             <path d="M 165 320 C 220 320, 240 200, 295 200" />
+             
+             {/* Path from SE-ResNet to Multi-Stat Pooling / Head */}
+             <path d="M 295 200 L 395 200" />
+             
+             {/* Path from Pooling Head to Calibrated Verdict */}
+             <path d="M 395 200 L 475 200" strokeDasharray="none" stroke="#444" />
            </g>
 
+           {/* Animated Pulse Packets */}
            <g fill="#CCFF00">
-             <circle r="3"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 60 200 Q 150 100, 220 100" /></circle>
-             <circle r="3"><animateMotion dur="3.2s" repeatCount="indefinite" path="M 60 200 Q 150 300, 220 300" /></circle>
-             <circle r="4"><animateMotion dur="1.8s" repeatCount="indefinite" path="M 220 100 Q 300 100, 360 200" /></circle>
-             <circle r="4"><animateMotion dur="2.2s" repeatCount="indefinite" path="M 220 300 Q 300 300, 360 200" /></circle>
+             <circle r="3"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 45 200 C 90 200, 110 80, 165 80" /></circle>
+             <circle r="3"><animateMotion dur="2.0s" repeatCount="indefinite" path="M 45 200 L 165 200" /></circle>
+             <circle r="3"><animateMotion dur="2.6s" repeatCount="indefinite" path="M 45 200 C 90 200, 110 320, 165 320" /></circle>
+             
+             <circle r="3.5"><animateMotion dur="2.2s" repeatCount="indefinite" path="M 165 80 C 220 80, 240 200, 295 200" /></circle>
+             <circle r="3.5"><animateMotion dur="1.8s" repeatCount="indefinite" path="M 165 200 L 295 200" /></circle>
+             <circle r="3.5"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 165 320 C 220 320, 240 200, 295 200" /></circle>
+
+             <circle r="4"><animateMotion dur="1.5s" repeatCount="indefinite" path="M 295 200 L 395 200" /></circle>
            </g>
            
-           <circle r="5" fill="#FF3333">
-             <animateMotion dur="1.5s" repeatCount="indefinite" path="M 360 200 L 450 200" />
+           <circle r="4.5" fill="#FF3333">
+             <animateMotion dur="1.2s" repeatCount="indefinite" path="M 395 200 L 475 200" />
            </circle>
 
-           <circle cx="60" cy="200" r="8" fill="#000" stroke="#888" strokeWidth="2" />
-           <text x="60" y="225" fill="#aaa" fontSize="10" fontFamily="monospace" textAnchor="middle" letterSpacing="1">AUDIO_IN</text>
+           {/* Node 1: Raw Audio In */}
+           <circle cx="45" cy="200" r="9" fill="#000" stroke="#888" strokeWidth="2" />
+           <text x="45" y="175" fill="#aaa" fontSize="10" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">AUDIO_IN</text>
+           <text x="45" y="225" fill="#666" fontSize="8" fontFamily="monospace" textAnchor="middle">16kHz PCM</text>
            
-           <circle cx="220" cy="100" r="14" fill="#000" stroke="#CCFF00" strokeWidth="2" />
-           <text x="220" y="70" fill="#CCFF00" fontSize="11" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">MULTI_RES_STFT</text>
-           <text x="220" y="130" fill="#777" fontSize="9" fontFamily="monospace" textAnchor="middle">512/1024/2048</text>
+           {/* STFT Channel 0: 1024-Mel */}
+           <circle cx="165" cy="80" r="12" fill="#000" stroke="#CCFF00" strokeWidth="2" />
+           <text x="165" y="55" fill="#CCFF00" fontSize="10" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">1024_MEL</text>
+           <text x="165" y="105" fill="#777" fontSize="8" fontFamily="monospace" textAnchor="middle">FORMANTS</text>
            
-           <circle cx="220" cy="300" r="14" fill="#000" stroke="#CCFF00" strokeWidth="2" />
-           <text x="220" y="270" fill="#CCFF00" fontSize="11" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">SE_RESIDUAL_CNN</text>
-           <text x="220" y="330" fill="#777" fontSize="9" fontFamily="monospace" textAnchor="middle">SPECTRAL_FEATURES</text>
+           {/* STFT Channel 1: 512-Linear */}
+           <circle cx="165" cy="200" r="12" fill="#000" stroke="#CCFF00" strokeWidth="2" />
+           <text x="165" y="180" fill="#CCFF00" fontSize="10" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">512_TIME</text>
+           <text x="165" y="225" fill="#777" fontSize="8" fontFamily="monospace" textAnchor="middle">PHASE TRANSIENTS</text>
            
-           <circle cx="360" cy="200" r="20" fill="#000" stroke="#fff" strokeWidth="2" />
-           <text x="360" y="170" fill="#fff" fontSize="11" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">CLASSIFIER</text>
-           <text x="360" y="240" fill="#777" fontSize="9" fontFamily="monospace" textAnchor="middle">FC_LAYERS</text>
+           {/* STFT Channel 2: 2048-Linear */}
+           <circle cx="165" cy="320" r="12" fill="#000" stroke="#CCFF00" strokeWidth="2" />
+           <text x="165" y="300" fill="#CCFF00" fontSize="10" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">2048_FREQ</text>
+           <text x="165" y="345" fill="#777" fontSize="8" fontFamily="monospace" textAnchor="middle">PITCH HARMONICS</text>
            
-           <circle cx="450" cy="200" r="12" fill="#000" stroke="#FF3333" strokeWidth="3">
-              <animate attributeName="stroke" values="#555; #FF3333; #555" dur="1s" repeatCount="indefinite" />
+           {/* Node 3: SE-ResNet Backbone */}
+           <circle cx="295" cy="200" r="16" fill="#000" stroke="#CCFF00" strokeWidth="2.5" />
+           <text x="295" y="170" fill="#CCFF00" fontSize="11" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">SE_RESNET</text>
+           <text x="295" y="232" fill="#888" fontSize="8" fontFamily="monospace" textAnchor="middle">ANISOTROPIC_CNN</text>
+           
+           {/* Node 4: 768-D Multi-Stat Pooling Head */}
+           <circle cx="395" cy="200" r="15" fill="#000" stroke="#fff" strokeWidth="2" />
+           <text x="395" y="172" fill="#fff" fontSize="11" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">768D_POOL</text>
+           <text x="395" y="230" fill="#888" fontSize="8" fontFamily="monospace" textAnchor="middle">MEAN/STD/MAX</text>
+           
+           {/* Node 5: Final Calibrated Verdict */}
+           <circle cx="475" cy="200" r="13" fill="#000" stroke="#FF3333" strokeWidth="3">
+              <animate attributeName="stroke" values="#555; #FF3333; #CCFF00; #FF3333" dur="2s" repeatCount="indefinite" />
            </circle>
-           <text x="450" y="175" fill="#FF3333" fontSize="12" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">VERDICT</text>
-           <text x="450" y="235" fill="#FF3333" fontSize="10" fontFamily="monospace" textAnchor="middle">DEEPFAKE / REAL</text>
+           <text x="475" y="175" fill="#FF3333" fontSize="11" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1">VERDICT</text>
+           <text x="475" y="230" fill="#aaa" fontSize="8" fontFamily="monospace" textAnchor="middle">τ=0.0509</text>
          </svg>
       </div>
     </div>
@@ -340,11 +401,11 @@ function formatBytes(bytes) {
 
 function PipelineStepper({ activeStage, uploadProgress, uploadPhase }) {
   const stages = [
-    { num: '01', name: 'STREAM UPLOAD', desc: uploadPhase === 'uploading' ? `${uploadProgress}%` : (activeStage > 1 ? 'COMPLETED' : 'READY') },
-    { num: '02', name: 'AUDIO RESAMPLING', desc: '16kHz PCM' },
-    { num: '03', name: 'MULTI-STFT', desc: '512/1024/2048' },
-    { num: '04', name: 'NEURAL CNN', desc: 'SE-RESNET' },
-    { num: '05', name: 'VERDICT', desc: 'CALIBRATED' },
+    { num: '01', name: 'STREAM INGEST', desc: uploadPhase === 'uploading' ? `${uploadProgress}%` : (activeStage > 1 ? 'COMPLETED' : 'READY') },
+    { num: '02', name: 'POLYPHASE RESAMPLE', desc: '16kHz PCM / DC' },
+    { num: '03', name: 'MULTI-STFT TENSOR', desc: '1024-Mel / 512 / 2048' },
+    { num: '04', name: 'SE-RESNET v3', desc: '768-D Multi-Stat Pool' },
+    { num: '05', name: 'FORENSIC VERDICT', desc: 'Calibrated τ=0.0509' },
   ];
 
   return (
@@ -852,10 +913,11 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
             </span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 font-mono text-[10px] sm:text-xs text-[#888888] min-w-0">
-            <span>MODEL: voice_deepfake_detector.pth</span>
-            <span>THRESHOLD: 5.09%</span>
+            <span>MODEL: voice_deepfake_detector.pth (SE-ResNet v3)</span>
+            <span>THRESHOLD: 5.09% (Youden's J)</span>
+            <span>BENCHMARK: 93.66% Acc | 98.71% AUC</span>
             <div className="flex items-center gap-1 min-w-0 max-w-full">
-              <span className="shrink-0">INPUT:</span>
+              <span className="shrink-0 text-[#aaa]">INPUT:</span>
               <span className="truncate max-w-[180px] xs:max-w-[240px] sm:max-w-xs text-white" title={fileName}>
                 {fileName ? fileName : (isRecording ? 'LIVE_STREAM' : 'STANDBY')}
               </span>
@@ -1277,14 +1339,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               <div className="mt-3 sm:mt-4 font-mono text-[11px] sm:text-xs tracking-wider sm:tracking-widest uppercase text-[#aaa] break-words">
                 {detectionData ? (
                   isFakeVerdict 
-                    ? `AI DEEPFAKE PROBABILITY: ${detectionData.fake_probability_pct}%` 
-                    : `HUMAN AUTHENTICITY: ${detectionData.real_probability_pct}%`
-                ) : 'Calibrated Decision Threshold: 5.09%'}
+                    ? `AI DEEPFAKE PROBABILITY: ${detectionData.fake_probability_pct}% (Above 5.09% Threshold)` 
+                    : `HUMAN AUTHENTICITY: ${detectionData.real_probability_pct}% (Below 5.09% Threshold)`
+                ) : 'Calibrated Decision Threshold: 5.09% (Youden\'s J Optimal)'}
               </div>
 
               {detectionData && (
                 <div className="mt-1.5 sm:mt-2 font-mono text-[9px] sm:text-[10px] text-[#666]">
-                  Calibrated Threshold: {detectionData.threshold} | Windows: {detectionData.audio_metrics?.windows_analyzed}
+                  Decision Boundary: {detectionData.threshold} (5.09%) | Analyzed Windows: {detectionData.audio_metrics?.windows_analyzed}
                 </div>
               )}
             </div>
@@ -1304,7 +1366,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                </div>
                <div className="flex justify-between font-mono text-[8px] sm:text-[9px] text-[#666] mt-1">
                  <span>0% REAL</span>
-                 <span className="text-white">| THRESHOLD 5.09%</span>
+                 <span className="text-[#CCFF00]">| THRESHOLD 5.09% (YOUDEN'S J)</span>
                  <span>100% AI</span>
                </div>
             </div>
@@ -1365,73 +1427,196 @@ function DataModule({ title, value, isAlert }) {
 }
 
 /* =========================================
-   TECHNOLOGY PAGE (Architecture)
+   TECHNOLOGY PAGE (Architecture & Forensics)
    ========================================= */
 function TechnologyPage() {
   return (
-    <div className="animate-in fade-in duration-700 bg-black p-4 sm:p-8 border border-[#1f1f1f]">
-      <div className="mb-8 sm:mb-16 border-b border-[#1f1f1f] pb-6 sm:pb-8">
-        <h2 className="text-3xl sm:text-4xl font-bold uppercase tracking-tighter mb-3 sm:mb-4 text-white">Architecture</h2>
-        <p className="font-mono text-[#888888] text-xs sm:text-sm uppercase tracking-widest">
-          PyTorch Multi-Domain Deepfake Verification Pipeline
-        </p>
+    <div className="animate-in fade-in duration-700 bg-black p-4 sm:p-8 border border-[#1f1f1f] space-y-10">
+      {/* Header */}
+      <div className="border-b border-[#1f1f1f] pb-6 sm:pb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 font-mono text-xs text-[#CCFF00] tracking-widest uppercase mb-2">
+            <span className="w-2 h-2 bg-[#CCFF00] animate-pulse" />
+            Forensic Architecture Specification
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold uppercase tracking-tighter text-white">Multi-Res SE-ResNet v3</h2>
+          <p className="font-mono text-[#888888] text-xs sm:text-sm uppercase tracking-widest mt-1">
+            PyTorch Multi-Resolution STFT & Time-Frequency SE-ResNet Pipeline
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 font-mono text-[10px] sm:text-xs">
+          <span className="px-2.5 py-1 bg-[#111] border border-[#333] text-white">TEST ACC: 93.66%</span>
+          <span className="px-2.5 py-1 bg-[#111] border border-[#333] text-[#CCFF00]">ROC-AUC: 98.71%</span>
+          <span className="px-2.5 py-1 bg-[#111] border border-[#333] text-[#aaa]">EER: 6.34%</span>
+        </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 md:gap-12">
-        <div className="space-y-8 sm:space-y-12">
+      {/* Main Grid */}
+      <div className="grid lg:grid-cols-12 gap-8 lg:gap-12">
+        {/* Left Column: 4 Forensic Stages */}
+        <div className="lg:col-span-7 space-y-10">
           
           <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
              <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
-             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 01</h3>
-             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">Multi-STFT Spectrogram Transform</h4>
-             <p className="text-[#888888] text-xs sm:text-sm leading-relaxed">
-               Raw audio is normalized and transformed into a 3-channel feature map using STFT windows of 512, 1024, and 2048 samples with 128 mel bins. This captures both fine temporal transients and long-range frequency harmonics.
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-1">Stage 01</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">
+               3-Channel Multi-Resolution Spectrogram Frontend
+             </h4>
+             <p className="text-[#aaa] text-xs sm:text-sm leading-relaxed mb-3">
+               Raw audio is polyphase resampled to 16,000 Hz, DC-offset corrected, and peak-amplitude normalized to [-1, 1]. To overcome the physical Gabor time-frequency resolution limit, the frontend computes three parallel STFT decompositions in float32 precision:
              </p>
+             <ul className="text-[#888] text-xs space-y-1.5 font-mono list-disc list-inside">
+               <li><strong className="text-white">Channel 0 (1024-Mel)</strong>: 128 mel-scale filterbanks (20–8000 Hz) mapping vocal tract geometry, phonetic formants, and biological acoustic timbre.</li>
+               <li><strong className="text-white">Channel 1 (512-Linear)</strong>: High temporal resolution (Δt ≈ 16ms) with 128 linearly-spaced bins via adaptive pooling, exposing vocoder frame splicing clicks and abrupt phoneme phase cancellations.</li>
+               <li><strong className="text-white">Channel 2 (2048-Linear)</strong>: High frequency resolution (Δf ≈ 7.8Hz) with 128 linearly-spaced bins, revealing unnatural harmonic rigidity, comb-filtering, and pitch quantization.</li>
+             </ul>
+             <div className="mt-3 text-[11px] font-mono text-[#666] bg-[#080808] p-2.5 border border-[#1a1a1a]">
+               Numerical Safeguard: Log dynamic range compression log(clamp(S, min=1e-5)) with per-channel instance normalization.
+             </div>
           </div>
 
           <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
              <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
-             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 02</h3>
-             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">Squeeze-and-Excitation Residual CNN</h4>
-             <p className="text-[#888888] text-xs sm:text-sm leading-relaxed">
-               4-stage convolutional backbone with SE-blocks (Squeeze-and-Excitation) that dynamically recalibrates channel-wise feature responses, picking up subtle checkerboard artifacts and phase irregularities left by neural vocoders (HiFi-GAN, MelGAN).
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-1">Stage 02</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">
+               Asymmetric Time-Frequency SE-ResNet Backbone
+             </h4>
+             <p className="text-[#aaa] text-xs sm:text-sm leading-relaxed mb-3">
+               Audio spectrogram dimensions represent fundamentally different physical quantities (horizontal = chronological time sequence vs. vertical = acoustic pitch). The backbone reflects this physics:
              </p>
+             <ul className="text-[#888] text-xs space-y-1.5 font-mono list-disc list-inside">
+               <li><strong className="text-white">Anisotropic Convolutions</strong>: Alternates between (5x3) kernels (wide temporal context for phonetic decay tracking) and (3x5) kernels (tall spectral context for harmonic overtone stacks).</li>
+               <li><strong className="text-white">Squeeze-and-Excitation (SE) Units</strong>: Integrated across every residual block with SiLU activations. Global context is squeezed into channel descriptors that dynamically amplify channels detecting vocoder checkerboard artifacts while dampening ambient room reverberation.</li>
+             </ul>
           </div>
 
           <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
              <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
-             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 03</h3>
-             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">Triple Statistical Pooling Classifier</h4>
-             <p className="text-[#888888] text-xs sm:text-sm leading-relaxed">
-               Feature maps are aggregated across mean, standard deviation, and max pooling (256 * 3 = 768 dimensions), fed through dense layers with SiLU activations and Dropout, outputting a calibrated sigmoid confidence score.
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-1">Stage 03</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">
+               Multi-Statistic Global Aggregation (768-D Embedding)
+             </h4>
+             <p className="text-[#aaa] text-xs sm:text-sm leading-relaxed mb-3">
+               Standard Global Average Pooling (GAP) smudges and dilutes fleeting 20ms synthetic glitches over a 2-second audio segment. VocalGuard extracts three independent summary statistics across the final 256-channel feature tensor:
              </p>
+             <ul className="text-[#888] text-xs space-y-1.5 font-mono list-disc list-inside">
+               <li><strong className="text-white">Global Mean (256-D)</strong>: Captures overall acoustic timbre, spectral envelope, and recording conditions.</li>
+               <li><strong className="text-white">Global StdDev (256-D)</strong>: Quantifies energy dispersion and dynamic range stability.</li>
+               <li><strong className="text-white">Global Adaptive Max (256-D)</strong>: Catches localized micro-glitches and vocoder phase spikes that averaging misses.</li>
+             </ul>
+             <div className="mt-3 text-[11px] font-mono text-[#666] bg-[#080808] p-2.5 border border-[#1a1a1a]">
+               Classifier Head: Linear(768→256) → LayerNorm → SiLU → Dropout(0.40) → Linear(256→64) → SiLU → Dropout(0.20) → Linear(64→1).
+             </div>
+          </div>
+
+          <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
+             <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-1">Stage 04</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">
+               Binary Focal Loss & Youden's J Calibration
+             </h4>
+             <p className="text-[#aaa] text-xs sm:text-sm leading-relaxed mb-3">
+               Trained on the curated Fake-or-Real (FoR / for-2sec) benchmark with Binary Focal Loss (γ = 2.0, α = 0.5) to prevent easy human voices from overwhelming gradient updates, paired with label smoothing (0.05) and spectral Mixup (α = 0.2, p = 0.5).
+             </p>
+             <div className="text-[11px] font-mono text-[#888] bg-[#080808] p-3 border border-[#1a1a1a] space-y-1">
+               <div>• <span className="text-[#CCFF00]">Optimal Threshold (τ*)</span>: Evaluated across 1,000 threshold candidates via Youden's J statistic (J = Sensitivity + Specificity - 1) on validation data: <strong className="text-white">τ* = 0.0509</strong>.</div>
+               <div>• <span className="text-[#CCFF00]">Unseen Test Set (1,088 clips)</span>: 93.66% accuracy, 98.71% ROC-AUC, 6.34% EER, 93.57% deepfake recall (509/544 caught), and 93.75% real specificity (510/544 verified).</div>
+             </div>
           </div>
 
         </div>
 
-        <div className="tech-panel bg-black p-4 sm:p-6 flex flex-col justify-between border border-[#1f1f1f]">
-          <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-3 sm:pb-4 mb-4 sm:mb-6">
-            Inference API Specification
-          </div>
+        {/* Right Column: Benchmark Table & API Specification */}
+        <div className="lg:col-span-5 space-y-6">
           
-          <div className="font-mono text-[10px] sm:text-xs leading-relaxed sm:leading-loose text-[#aaa] overflow-x-auto">
-            <span className="text-[#CCFF00]">POST</span> /api/detect<br/>
-            Content-Type: multipart/form-data<br/>
-            Body: file=[audio_file_binary]<br/>
-            <br/>
-            Response (JSON):<br/>
-            {"{"}<br/>
-            &nbsp;&nbsp;"verdict": <span className="text-[#FF3333]">"FAKE"</span>,<br/>
-            &nbsp;&nbsp;"is_fake": true,<br/>
-            &nbsp;&nbsp;"threat_score": <span className="text-[#FF3333]">65.9</span>,<br/>
-            &nbsp;&nbsp;"fake_probability_pct": 65.9,<br/>
-            &nbsp;&nbsp;"real_probability_pct": 34.1,<br/>
-            &nbsp;&nbsp;"threshold": 0.0509,<br/>
-            &nbsp;&nbsp;"alert_level": <span className="text-[#FF3333]">"HIGH"</span>,<br/>
-            &nbsp;&nbsp;"latency_ms": 18.4,<br/>
-            &nbsp;&nbsp;"audio_metrics": {"{"} "duration_seconds": 2.1 {"}"}<br/>
-            {"}"}
+          {/* Official Evaluation Verification Card */}
+          <div className="tech-panel bg-black p-5 border border-[#1f1f1f]">
+            <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-3 mb-4 flex justify-between items-center">
+              <span>Benchmark Verification</span>
+              <span className="text-[10px] text-[#CCFF00] font-bold">FoR Official Test Split</span>
+            </div>
+            
+            <div className="space-y-3 font-mono text-xs">
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">Test Dataset Partition</span>
+                <span className="text-white">FoR for-2sec (1,088 clips)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">Overall Test Accuracy</span>
+                <span className="text-[#CCFF00] font-bold">93.66% (1,019 / 1,088)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">ROC-AUC Metric</span>
+                <span className="text-[#CCFF00] font-bold">98.71% (0.9871)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">Equal Error Rate (EER)</span>
+                <span className="text-white font-bold">6.34%</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">Deepfake Recall (TPR)</span>
+                <span className="text-white font-bold">93.57% (509 / 544 caught)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">Human Voice Specificity</span>
+                <span className="text-white font-bold">93.75% (510 / 544 verified)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#151515]">
+                <span className="text-[#888]">Calibrated Decision Boundary</span>
+                <span className="text-[#CCFF00] font-bold">0.0509 (Youden's J)</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-[#888]">Model Checkpoint Size</span>
+                <span className="text-white">12.86 MB (PyTorch FP32)</span>
+              </div>
+            </div>
           </div>
+
+          {/* API Specification */}
+          <div className="tech-panel bg-black p-5 border border-[#1f1f1f]">
+            <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-3 mb-4 flex justify-between items-center">
+              <span>Inference API Specification</span>
+              <span className="text-[10px] text-[#aaa]">FASTAPI / PYTORCH</span>
+            </div>
+            
+            <div className="font-mono text-[10px] sm:text-xs leading-relaxed text-[#aaa] space-y-2">
+              <div className="text-white">
+                <span className="text-[#CCFF00] font-bold">POST</span> <span className="text-[#888]">/api/detect</span>
+              </div>
+              <div className="text-[#777] text-[10px]">
+                Content-Type: multipart/form-data<br/>
+                Body: file=[audio_file_binary]
+              </div>
+              
+              <div className="pt-2 text-[10px] text-[#888]">Response Schema (JSON):</div>
+              <pre className="p-3 bg-[#050505] border border-[#222] text-[#bbb] text-[10px] overflow-x-auto leading-normal font-mono">
+{`{
+  "verdict": "FAKE",
+  "is_fake": true,
+  "threat_score": 65.9,
+  "threat_probability": 0.659,
+  "fake_probability_pct": 65.9,
+  "real_probability_pct": 34.1,
+  "threshold": 0.0509,
+  "alert_level": "HIGH",
+  "latency_ms": 18.4,
+  "audio_metrics": {
+    "duration_seconds": 2.1,
+    "processed_sample_rate": 16000,
+    "windows_analyzed": 1,
+    "peak_amplitude": 0.982,
+    "spectral_centroid_hz": 1737.1
+  },
+  "spectral_flags": {
+    "phase_anomaly": "ERR_PHASE",
+    "vocoder_artifacts": "SYNTH_MATCH",
+    "prosody_stability": "UNNATURAL"
+  }
+}`}
+              </pre>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
