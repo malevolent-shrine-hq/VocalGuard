@@ -1659,7 +1659,7 @@ function AboutPage({ setActiveView }) {
       github: "https://github.com/Bimbok",
       handle: "@Bimbok",
       avatar: "https://avatars.githubusercontent.com/u/132834022?v=4",
-      role: "Lead Machine Learning & Backend Engineer",
+      role: "Machine Learning & Backend Systems Engineer",
       badge: "MODEL & BACKEND ARCHITECTURE",
       bio: "Co-developed the PyTorch Multi-Resolution SE-ResNet (v3) deep learning model and the backend server architecture alongside Aditya. Formulated the 3-channel STFT representation (1024-Mel formants, 512-Linear temporal transients, 2048-Linear harmonic pitch overtones), focal loss training, and Youden's J calibration (τ* = 0.0509). Co-engineered the high-performance FastAPI inference gateway, polyphase audio resampling pipeline, and production deployment on Render.",
       skills: ["PyTorch", "Model Architecture", "FastAPI Backend", "DSP Pipelines", "Focal Loss & Calibration"]
@@ -1679,7 +1679,7 @@ function AboutPage({ setActiveView }) {
       github: "https://github.com/bijanmurmu",
       handle: "@bijanmurmu",
       avatar: "https://avatars.githubusercontent.com/u/73417763?v=4",
-      role: "Lead Frontend & UI/UX Engineer",
+      role: "Frontend & UI/UX Systems Engineer",
       badge: "FRONTEND & UI/UX ARCHITECTURE",
       bio: "Architected and engineered the complete frontend web application and interactive user experience for VocalGuard. Designed the industrial cyber-brutalist operations console, 60 FPS HTML5 Canvas real-time audio waveform telemetry, and responsive mobile-optimized layouts. Integrated the Web Audio API microphone capture, multi-stage analysis progress steppers, and client-side communication with the backend inference gateway.",
       skills: ["React 19", "Vite", "Tailwind CSS", "HTML5 Canvas Telemetry", "Web Audio API", "UI/UX Architecture"]
