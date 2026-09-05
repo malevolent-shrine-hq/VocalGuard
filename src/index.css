@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-base: #000000;
+    --border-subtle: #1f1f1f;
+    --text-main: #f5f5f5;
+    --text-muted: #888888;
+    --accent-lime: #CCFF00;
+    --accent-red: #FF3333;
+  }
+  
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-main);
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  /* Brutalist/Industrial technical panel */
+  .tech-panel {
+    @apply bg-black border border-[#1f1f1f] shadow-none;
+  }
+  
+  /* Sharp, high-contrast buttons */
+  .btn-primary {
+    @apply bg-[#CCFF00] text-black font-semibold font-mono tracking-widest text-xs uppercase px-8 py-4 hover:bg-white transition-colors duration-150;
+  }
+  
+  .btn-outline {
+    @apply bg-black border border-[#333] text-white font-semibold font-mono tracking-widest text-xs uppercase px-8 py-4 hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors duration-150;
+  }
+}
