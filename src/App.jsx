@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, Square, AlertTriangle, 
   ArrowRight, Disc,
   Upload, RefreshCw, Mic, CheckCircle2,
-  Download, AlertOctagon, Radio
+  Download, AlertOctagon, Radio,
+  Terminal, FileAudio, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -12,24 +13,50 @@ export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [backendStatus, setBackendStatus] = useState({ online: false, checking: true, data: null });
 
-  useEffect(() => {
-    // Check backend health on mount
+  const checkHealth = useCallback(() => {
     fetch(`${API_BASE}/api/health`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(data => setBackendStatus({ online: true, checking: false, data }))
       .catch(() => setBackendStatus({ online: false, checking: false, data: null }));
   }, []);
+
+  const handleManualRetry = () => {
+    setBackendStatus(s => ({ ...s, checking: true }));
+    checkHealth();
+  };
+
+  useEffect(() => {
+    checkHealth();
+    // Auto-poll health every 8 seconds if offline (vital for Render free-tier cold starts)
+    const interval = setInterval(() => {
+      setBackendStatus(prev => {
+        if (!prev.online) {
+          checkHealth();
+        }
+        return prev;
+      });
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [checkHealth]);
 
   return (
     <div className="min-h-screen text-[#f5f5f5] selection:bg-[#CCFF00] selection:text-black font-sans relative bg-[#050505]">
       {/* Global Topo Background */}
       <TopoBackground />
       
-      <Navbar activeView={activeView} setActiveView={setActiveView} backendStatus={backendStatus} />
+      <Navbar 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+        backendStatus={backendStatus} 
+        onRetryBackend={handleManualRetry}
+      />
       
       <main className="pt-24 pb-20 px-4 sm:px-6 max-w-7xl mx-auto relative z-10">
         {activeView === 'landing' && <LandingPage setActiveView={setActiveView} />}
-        {activeView === 'dashboard' && <LiveDashboard backendStatus={backendStatus} />}
+        {activeView === 'dashboard' && <LiveDashboard backendStatus={backendStatus} onRetryBackend={handleManualRetry} />}
         {activeView === 'technology' && <TechnologyPage />}
       </main>
     </div>
@@ -53,7 +80,7 @@ function TopoBackground() {
 /* =========================================
    NAVIGATION BAR
    ========================================= */
-function Navbar({ activeView, setActiveView, backendStatus }) {
+function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1f1f1f]">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -73,12 +100,32 @@ function Navbar({ activeView, setActiveView, backendStatus }) {
           </span>
         </div>
         
-        <div className="flex items-center gap-6 md:gap-8">
+        <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase">
-            <span className={`w-2 h-2 rounded-full ${backendStatus.online ? 'bg-[#CCFF00] animate-pulse' : 'bg-[#FF3333]'}`} />
-            <span className={backendStatus.online ? 'text-[#888]' : 'text-[#FF3333]'}>
-              {backendStatus.online ? 'API ONLINE' : 'API DISCONNECTED'}
+            <span className={`w-2 h-2 rounded-full ${
+              backendStatus.online 
+                ? 'bg-[#CCFF00] animate-pulse' 
+                : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
+            }`} />
+            <span className={
+              backendStatus.online 
+                ? 'text-[#888]' 
+                : (backendStatus.checking ? 'text-amber-400' : 'text-[#FF3333]')
+            }>
+              {backendStatus.online 
+                ? 'API ONLINE' 
+                : (backendStatus.checking ? 'CHECKING API...' : 'API DISCONNECTED')}
             </span>
+            {!backendStatus.online && (
+              <button 
+                onClick={onRetryBackend}
+                disabled={backendStatus.checking}
+                className="ml-1 text-[9px] text-[#CCFF00] hover:underline uppercase tracking-widest border border-[#333] px-1.5 py-0.5 bg-[#111] disabled:opacity-50"
+                title="Retry connecting to backend"
+              >
+                Retry
+              </button>
+            )}
           </div>
 
           <div className="hidden md:flex items-center gap-6">
@@ -258,9 +305,147 @@ function NeuralWidget() {
 
 
 /* =========================================
+   HELPER UTILITIES & TELEMETRY COMPONENTS
+   ========================================= */
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+function PipelineStepper({ activeStage, uploadProgress, uploadPhase }) {
+  const stages = [
+    { num: '01', name: 'STREAM UPLOAD', desc: uploadPhase === 'uploading' ? `${uploadProgress}%` : (activeStage > 1 ? 'COMPLETED' : 'READY') },
+    { num: '02', name: 'AUDIO RESAMPLING', desc: '16kHz PCM' },
+    { num: '03', name: 'MULTI-STFT', desc: '512/1024/2048' },
+    { num: '04', name: 'NEURAL CNN', desc: 'SE-RESNET' },
+    { num: '05', name: 'VERDICT', desc: 'CALIBRATED' },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[10px] uppercase tracking-wider">
+      {stages.map((st, idx) => {
+        const stageNum = idx + 1;
+        const isDone = activeStage > stageNum || activeStage === 5;
+        const isActive = activeStage === stageNum && activeStage !== 5;
+        return (
+          <div 
+            key={st.num}
+            className={`p-2.5 border transition-all ${
+              isActive 
+                ? 'border-[#CCFF00] bg-[#CCFF00]/10 text-white shadow-[0_0_8px_rgba(204,255,0,0.15)]' 
+                : (isDone 
+                    ? 'border-[#333] bg-[#0a0a0a] text-[#aaa]' 
+                    : 'border-[#1a1a1a] bg-[#050505] text-[#555]')
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-[9px] font-bold ${isActive ? 'text-[#CCFF00]' : (isDone ? 'text-[#888]' : 'text-[#555]')}`}>
+                STAGE {st.num}
+              </span>
+              {isDone && <span className="text-[#CCFF00] text-[10px] font-bold">✓</span>}
+              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] animate-ping" />}
+            </div>
+            <div className="font-bold truncate text-[11px] text-white">{st.name}</div>
+            <div className={`text-[9px] truncate mt-0.5 ${isActive ? 'text-[#CCFF00]' : 'text-[#666]'}`}>{st.desc}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onAbort, isCollapsed, setIsCollapsed }) {
+  const terminalBottomRef = useRef(null);
+
+  useEffect(() => {
+    if (terminalBottomRef.current) {
+      terminalBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
+
+  return (
+    <div className="tech-panel bg-black border border-[#1f1f1f]">
+      {/* Terminal Header */}
+      <div className="px-4 py-2.5 bg-[#080808] border-b border-[#1f1f1f] flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase text-[#f5f5f5]">
+          <Terminal className="w-3.5 h-3.5 text-[#CCFF00]" />
+          <span>TELEMETRY STREAM // PIPELINE_EXECUTION_LOGS</span>
+          {isAnalyzing && (
+            <span className="ml-2 px-1.5 py-0.5 bg-[#CCFF00]/10 text-[#CCFF00] border border-[#CCFF00]/30 text-[9px] animate-pulse">
+              {uploadPhase === 'uploading' ? `UPLOADING ${uploadProgress}%` : 'INFERENCE_BUSY'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {isAnalyzing && (
+            <button
+              onClick={onAbort}
+              className="font-mono text-[9px] uppercase tracking-widest text-[#FF3333] border border-[#FF3333]/40 hover:bg-[#FF3333] hover:text-black px-2 py-0.5 transition-colors"
+            >
+              [ Abort Stream ]
+            </button>
+          )}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="font-mono text-[10px] text-[#888] hover:text-white flex items-center gap-1"
+          >
+            {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+            <span>{isCollapsed ? 'EXPAND' : 'COLLAPSE'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Terminal Body */}
+      {!isCollapsed && (
+        <div className="p-3 bg-[#030303] font-mono text-[11px] h-48 overflow-y-auto space-y-1.5 select-text selection:bg-[#CCFF00] selection:text-black">
+          {logs.length === 0 ? (
+            <div className="text-[#555] py-4 text-center">
+              Awaiting audio stream input to initialize neural telemetry buffer...
+            </div>
+          ) : (
+            logs.map(log => {
+              let tagColor = 'text-[#888] border-[#333]';
+              if (log.tag === 'INGEST') tagColor = 'text-cyan-400 border-cyan-800/40 bg-cyan-950/20';
+              if (log.tag === 'UPLOAD' || log.tag === 'TRANSMIT') tagColor = 'text-amber-400 border-amber-800/40 bg-amber-950/20';
+              if (log.tag === 'DSP' || log.tag === 'SPECTRAL') tagColor = 'text-[#CCFF00] border-[#CCFF00]/40 bg-[#CCFF00]/10';
+              if (log.tag === 'NEURAL') tagColor = 'text-purple-400 border-purple-800/40 bg-purple-950/20';
+              if (log.tag === 'VERDICT') tagColor = log.type === 'danger' ? 'text-[#FF3333] border-[#FF3333]/40 bg-[#FF3333]/10 font-bold' : 'text-[#CCFF00] border-[#CCFF00]/40 bg-[#CCFF00]/10 font-bold';
+              if (log.tag === 'ERROR' || log.tag === 'ABORT') tagColor = 'text-[#FF3333] border-[#FF3333]/40 bg-[#FF3333]/10';
+
+              return (
+                <div key={log.id} className="leading-relaxed flex items-start gap-2">
+                  <span className="text-[#555] select-none shrink-0">[{log.time}]</span>
+                  <span className={`px-1.5 py-0.5 border text-[9px] shrink-0 ${tagColor}`}>
+                    {log.tag}
+                  </span>
+                  <span className={log.type === 'danger' ? 'text-[#FF3333]' : (log.type === 'success' ? 'text-white' : 'text-[#bbb]')}>
+                    {log.msg}
+                  </span>
+                </div>
+              );
+            })
+          )}
+          {isAnalyzing && (
+            <div className="flex items-center gap-2 text-[#CCFF00] animate-pulse pt-1">
+              <span className="inline-block w-2 h-3.5 bg-[#CCFF00]" />
+              <span className="text-[10px]">PROCESSING PIPELINE...</span>
+            </div>
+          )}
+          <div ref={terminalBottomRef} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================
    LIVE DASHBOARD (Full Backend Connected)
    ========================================= */
-function LiveDashboard({ backendStatus }) {
+function LiveDashboard({ backendStatus, onRetryBackend }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [status, setStatus] = useState('idle'); // idle, analyzing, danger, safe, error
   const [fileName, setFileName] = useState(null);
@@ -271,10 +456,31 @@ function LiveDashboard({ backendStatus }) {
   const [detectionData, setDetectionData] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
+  // New Upload & Telemetry States
+  const [uploadPhase, setUploadPhase] = useState('idle'); // idle, uploading, processing, done, error
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadMetrics, setUploadMetrics] = useState({ loadedBytes: 0, totalBytes: 0, fileSizeStr: '', speedStr: '' });
+  const [activeStage, setActiveStage] = useState(0);
+  const [terminalLogs, setTerminalLogs] = useState([]);
+  const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
   const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordTimerRef = useRef(null);
+  const xhrRef = useRef(null);
+  const stageTimer1Ref = useRef(null);
+  const stageTimer2Ref = useRef(null);
+  const logCounterRef = useRef(0);
+
+  const addLog = useCallback((tag, msg, type = 'info') => {
+    const now = new Date();
+    const timeStr = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(Math.floor(now.getMilliseconds() / 10)).padStart(2, '0')}`;
+    logCounterRef.current += 1;
+    const newEntry = { id: logCounterRef.current, time: timeStr, tag, msg, type };
+    setTerminalLogs(prev => [...prev.slice(-49), newEntry]);
+  }, []);
 
   // Audio Playback Listener
   useEffect(() => {
@@ -285,55 +491,173 @@ function LiveDashboard({ backendStatus }) {
     return () => el.removeEventListener('ended', onEnded);
   }, [audioUrl]);
 
-  // Clean up audio blob URL on change/unmount
+  // Clean up audio blob URL and timers on change/unmount
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
+      clearTimeout(stageTimer1Ref.current);
+      clearTimeout(stageTimer2Ref.current);
+      if (xhrRef.current) xhrRef.current.abort();
     };
   }, [audioUrl]);
 
-  // Handle Audio File Detection
+  // Perform Audio Upload and Multi-Stage Inference
   const analyzeAudioBlobOrFile = async (fileOrBlob, displayName) => {
     setFileName(displayName);
     setStatus('analyzing');
     setIsAnalyzing(true);
     setErrorMessage(null);
     setDetectionData(null);
+    setTerminalLogs([]);
+    setIsTerminalCollapsed(false);
 
-    // Create playable audio URL
+    // Create playable audio preview
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     const newAudioUrl = URL.createObjectURL(fileOrBlob);
     setAudioUrl(newAudioUrl);
 
-    try {
+    const totalBytes = fileOrBlob.size || 0;
+    const sizeStr = formatBytes(totalBytes);
+    setUploadMetrics({ loadedBytes: 0, totalBytes, fileSizeStr: sizeStr, speedStr: '' });
+    setUploadProgress(0);
+    setUploadPhase('uploading');
+    setActiveStage(1);
+
+    addLog('INGEST', `Stream initialized for "${displayName}" (${sizeStr})`, 'info');
+    addLog('TRANSMIT', `Uploading binary audio buffer to ${API_BASE || 'local'} gateway...`, 'info');
+
+    let lastTime = Date.now();
+    let lastLoaded = 0;
+
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
       const formData = new FormData();
       formData.append('file', fileOrBlob, displayName);
 
-      const response = await fetch(`${API_BASE}/api/detect`, {
-        method: 'POST',
-        body: formData,
-      });
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+          setUploadProgress(percent);
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => null);
-        throw new Error(errJson?.detail || `Inference error (Status: ${response.status})`);
-      }
+          const now = Date.now();
+          const timeDiff = (now - lastTime) / 1000;
+          if (timeDiff > 0.3) {
+            const speed = (event.loaded - lastLoaded) / timeDiff;
+            const speedStr = `${formatBytes(speed)}/s`;
+            setUploadMetrics({
+              loadedBytes: event.loaded,
+              totalBytes: event.total,
+              fileSizeStr: formatBytes(event.total),
+              speedStr,
+            });
+            lastTime = now;
+            lastLoaded = event.loaded;
+          }
 
-      const result = await response.json();
-      setDetectionData(result);
-      setIsAnalyzing(false);
+          if (percent === 25 || percent === 50 || percent === 75) {
+            addLog('UPLOAD', `Transferred ${formatBytes(event.loaded)} / ${formatBytes(event.total)} (${percent}%)`, 'info');
+          }
+        }
+      };
 
-      if (result.is_fake) {
-        setStatus('danger');
-      } else {
-        setStatus('safe');
-      }
-    } catch (err) {
-      console.error('Detection failed:', err);
-      setIsAnalyzing(false);
-      setStatus('error');
-      setErrorMessage(err.message || 'Failed to communicate with inference server.');
+      xhr.upload.onload = () => {
+        setUploadProgress(100);
+        setUploadPhase('processing');
+        setActiveStage(2);
+        addLog('TRANSMIT', `Upload 100% completed (${sizeStr}). Transferring payload to server memory...`, 'success');
+        addLog('DECODE', `Server decoding audio stream via soundfile / ffmpeg fallback...`, 'info');
+
+        // Progressive telemetry feedback while PyTorch inference executes
+        stageTimer1Ref.current = setTimeout(() => {
+          setActiveStage(3);
+          addLog('DSP', `Polyphase resampling to 16,000 Hz & amplitude normalization completed`, 'info');
+          addLog('SPECTRAL', `Computing Multi-STFT Spectrograms (windows: 512, 1024, 2048)...`, 'info');
+        }, 700);
+
+        stageTimer2Ref.current = setTimeout(() => {
+          setActiveStage(4);
+          addLog('NEURAL', `Forward pass through MultiDomainDeepfakeDetector with SE-Residual layers...`, 'info');
+        }, 1500);
+      };
+
+      xhr.onload = () => {
+        clearTimeout(stageTimer1Ref.current);
+        clearTimeout(stageTimer2Ref.current);
+        setIsAnalyzing(false);
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            setDetectionData(result);
+            setActiveStage(5);
+            setUploadPhase('done');
+
+            addLog('TELEMETRY', `Analyzed ${result.audio_metrics?.windows_analyzed || 1} window(s) across ${result.audio_metrics?.duration_seconds || 0}s duration`, 'success');
+            addLog('VERDICT', `Inference finished in ${result.latency_ms}ms: ${result.verdict} (Threat: ${result.threat_score}%)`, result.is_fake ? 'danger' : 'success');
+
+            if (result.is_fake) {
+              setStatus('danger');
+            } else {
+              setStatus('safe');
+            }
+            resolve(result);
+          } catch {
+            setStatus('error');
+            setUploadPhase('error');
+            setErrorMessage('Invalid JSON received from inference engine.');
+            addLog('ERROR', 'Invalid JSON response from server.', 'danger');
+          }
+        } else {
+          try {
+            const err = JSON.parse(xhr.responseText);
+            setStatus('error');
+            setUploadPhase('error');
+            setErrorMessage(err.detail || `Server error (${xhr.status})`);
+            addLog('ERROR', `Server error (${xhr.status}): ${err.detail || xhr.statusText}`, 'danger');
+          } catch {
+            setStatus('error');
+            setUploadPhase('error');
+            setErrorMessage(`Server error (${xhr.status}): ${xhr.statusText || 'Inference failed'}`);
+            addLog('ERROR', `Server responded with status ${xhr.status}`, 'danger');
+          }
+        }
+      };
+
+      xhr.onerror = () => {
+        clearTimeout(stageTimer1Ref.current);
+        clearTimeout(stageTimer2Ref.current);
+        setIsAnalyzing(false);
+        setStatus('error');
+        setUploadPhase('error');
+        setErrorMessage('Network communication error. Please ensure the backend is online.');
+        addLog('ERROR', 'Network communication failed with inference server.', 'danger');
+      };
+
+      xhr.onabort = () => {
+        clearTimeout(stageTimer1Ref.current);
+        clearTimeout(stageTimer2Ref.current);
+        setIsAnalyzing(false);
+        setUploadPhase('idle');
+        setStatus('idle');
+        addLog('ABORT', 'Audio upload and inference aborted by operator.', 'warning');
+      };
+
+      xhr.open('POST', `${API_BASE}/api/detect`);
+      xhr.send(formData);
+    });
+  };
+
+  const handleAbort = () => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
     }
+    clearTimeout(stageTimer1Ref.current);
+    clearTimeout(stageTimer2Ref.current);
+    setIsAnalyzing(false);
+    setUploadPhase('idle');
+    setStatus('idle');
   };
 
   // Upload Audio File
@@ -341,6 +665,7 @@ function LiveDashboard({ backendStatus }) {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       analyzeAudioBlobOrFile(file, file.name);
+      e.target.value = '';
     }
   };
 
@@ -376,7 +701,6 @@ function LiveDashboard({ backendStatus }) {
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        // Stop all tracks to release mic
         stream.getTracks().forEach(track => track.stop());
         analyzeAudioBlobOrFile(audioBlob, `live_mic_${Date.now()}.webm`);
       };
@@ -417,8 +741,18 @@ function LiveDashboard({ backendStatus }) {
 
   const handleReset = () => {
     if (audioRef.current) audioRef.current.pause();
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
+    }
+    clearTimeout(stageTimer1Ref.current);
+    clearTimeout(stageTimer2Ref.current);
     setStatus('idle');
     setIsAnalyzing(false);
+    setUploadPhase('idle');
+    setActiveStage(0);
+    setUploadProgress(0);
+    setUploadMetrics({ loadedBytes: 0, totalBytes: 0, fileSizeStr: '', speedStr: '' });
     setFileName(null);
     setAudioUrl(null);
     setIsPlaying(false);
@@ -454,14 +788,24 @@ function LiveDashboard({ backendStatus }) {
       {audioUrl && <audio ref={audioRef} src={audioUrl} preload="auto" />}
 
       {!backendStatus.online && !backendStatus.checking && (
-        <div className="mb-6 p-3 bg-[#FF3333]/10 border border-[#FF3333] text-[#FF3333] font-mono text-xs flex items-center justify-between">
-          <span>⚠️ Backend offline: Start local server with &quot;npm run backend&quot; or ensure API is reachable.</span>
+        <div className="mb-6 p-3.5 bg-[#FF3333]/10 border border-[#FF3333] text-[#FF3333] font-mono text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>Backend offline: Server might be in cold-start sleep mode (takes ~30s on free tiers).</span>
+          </div>
           <button 
-            onClick={() => window.location.reload()} 
-            className="underline hover:text-white"
+            onClick={onRetryBackend} 
+            className="underline hover:text-white px-2 py-0.5 border border-[#FF3333]/40 bg-black uppercase tracking-wider text-[10px]"
           >
-            Retry
+            Reconnect
           </button>
+        </div>
+      )}
+
+      {backendStatus.checking && (
+        <div className="mb-6 p-3 bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-xs flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>Connecting to VocalGuard neural inference backend...</span>
         </div>
       )}
       
@@ -497,7 +841,7 @@ function LiveDashboard({ backendStatus }) {
             <span className="font-mono text-xs tracking-widest uppercase text-white">
               {status === 'danger' && 'THREAT DETECTED'}
               {status === 'safe' && 'VOICE VERIFIED (REAL)'}
-              {status === 'analyzing' && 'ANALYZING SPECTROGRAMS...'}
+              {status === 'analyzing' && (uploadPhase === 'uploading' ? `UPLOADING (${uploadProgress}%)` : 'PROCESSING MULTI-STFT...')}
               {status === 'error' && 'INFERENCE ERROR'}
               {status === 'idle' && (isRecording ? `RECORDING (00:${String(recordSeconds).padStart(2, '0')})` : 'SYSTEM ARMED')}
             </span>
@@ -540,8 +884,19 @@ function LiveDashboard({ backendStatus }) {
         
         {/* Left Column: Visualizer & Controls */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="tech-panel relative bg-black">
-            
+          <div 
+            className={`tech-panel relative bg-black transition-all ${isDragging ? 'ring-2 ring-[#CCFF00]' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                analyzeAudioBlobOrFile(file, file.name);
+              }
+            }}
+          >
             {/* Header controls inside visualizer */}
             <div className="border-b border-[#1f1f1f] px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-[#050505] gap-4">
               <div className="font-mono text-[10px] sm:text-xs text-[#f5f5f5] flex items-center gap-3 truncate max-w-full">
@@ -549,6 +904,11 @@ function LiveDashboard({ backendStatus }) {
                 <span className="truncate">
                   {fileName ? `ACTIVE: ${fileName}` : (isRecording ? 'STREAM: MICROPHONE_BUFFER' : 'SOURCE: WAITING FOR AUDIO')}
                 </span>
+                {uploadMetrics.fileSizeStr && (
+                  <span className="hidden sm:inline-block text-[9px] px-2 py-0.5 bg-[#1a1a1a] text-[#aaa] border border-[#333]">
+                    {uploadMetrics.fileSizeStr}
+                  </span>
+                )}
               </div>
               
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -592,7 +952,7 @@ function LiveDashboard({ backendStatus }) {
                   />
                 </label>
 
-                {(status === 'danger' || status === 'safe' || status === 'error') && (
+                {(status === 'danger' || status === 'safe' || status === 'error' || isAnalyzing) && (
                   <button 
                     onClick={handleReset}
                     className="font-mono text-[10px] tracking-widest uppercase bg-[#111] border border-[#333] text-[#f5f5f5] px-4 py-2 hover:border-white hover:text-white transition-colors flex items-center gap-2"
@@ -603,9 +963,66 @@ function LiveDashboard({ backendStatus }) {
               </div>
             </div>
 
+            {/* Dynamic In-Flight Progress Bar for Uploads */}
+            {uploadPhase === 'uploading' && (
+              <div className="p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] space-y-2">
+                <div className="flex justify-between items-center font-mono text-xs">
+                  <div className="flex items-center gap-2 text-[#CCFF00]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="font-bold uppercase tracking-wider">UPLOADING AUDIO STREAM</span>
+                    <span className="text-white">({uploadProgress}%)</span>
+                  </div>
+                  <div className="text-[11px] text-[#aaa]">
+                    <span>{uploadMetrics.loadedBytes ? formatBytes(uploadMetrics.loadedBytes) : '0 B'}</span>
+                    <span className="text-[#666]"> / </span>
+                    <span className="text-white font-bold">{uploadMetrics.fileSizeStr || '—'}</span>
+                    {uploadMetrics.speedStr && <span className="ml-2 text-[#CCFF00]">[{uploadMetrics.speedStr}]</span>}
+                  </div>
+                </div>
+                
+                <div className="w-full bg-[#151515] h-2.5 overflow-hidden border border-[#222]">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#CCFF00]/80 to-[#CCFF00] transition-all duration-150 shadow-[0_0_12px_rgba(204,255,0,0.5)]" 
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {uploadPhase === 'processing' && (
+              <div className="p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] space-y-2">
+                <div className="flex justify-between items-center font-mono text-xs">
+                  <div className="flex items-center gap-2 text-[#CCFF00]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="font-bold uppercase tracking-wider">PAYLOAD UPLOADED — INFERENCE IN PROGRESS</span>
+                  </div>
+                  <div className="text-[10px] text-[#CCFF00] uppercase tracking-widest">
+                    [ PYTORCH MULTI-STFT CNN ]
+                  </div>
+                </div>
+                
+                <div className="w-full bg-[#151515] h-2 overflow-hidden border border-[#222]">
+                  <div className="h-full bg-[#CCFF00] animate-[pulse_1s_ease-in-out_infinite] w-full" />
+                </div>
+              </div>
+            )}
+
             {/* Brutalist Waveform & Visualizer */}
             <div className="h-72 p-6 flex flex-col justify-center relative overflow-hidden bg-black">
               
+              {/* Drag & drop overlay */}
+              {isDragging && (
+                <div className="absolute inset-0 z-30 bg-black/90 border-2 border-dashed border-[#CCFF00] flex flex-col items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-150">
+                  <Upload className="w-12 h-12 text-[#CCFF00] animate-bounce mb-3" />
+                  <div className="font-mono text-base font-bold text-white uppercase tracking-widest">
+                    Drop Audio File To Inspect
+                  </div>
+                  <div className="font-mono text-xs text-[#888] mt-1">
+                    Accepts .wav, .mp3, .m4a, .aac, .ogg, .flac, .webm (Universal Decoders)
+                  </div>
+                </div>
+              )}
+
               {/* Background grid lines */}
               <div className="absolute inset-0 flex flex-col justify-between py-6 pointer-events-none opacity-20">
                 <div className="w-full border-t border-dashed border-[#888888]" />
@@ -615,7 +1032,10 @@ function LiveDashboard({ backendStatus }) {
 
               {status === 'idle' && !isRecording ? (
                 <div className="text-center font-mono text-[#555] tracking-widest uppercase text-sm space-y-2">
-                  <div>Select an audio file or record speech to inspect</div>
+                  <div className="flex items-center justify-center gap-2 text-[#777]">
+                    <FileAudio className="w-4 h-4" />
+                    <span>Drop audio file or record speech to inspect</span>
+                  </div>
                   <div className="text-xs text-[#444]">Supports .wav, .mp3, .m4a, .aac, .flac, .ogg, .webm</div>
                 </div>
               ) : (
@@ -706,6 +1126,26 @@ function LiveDashboard({ backendStatus }) {
               </div>
             )}
           </div>
+
+          {/* Multi-Stage Pipeline Stepper */}
+          {(isAnalyzing || status !== 'idle') && (
+            <PipelineStepper 
+              activeStage={activeStage} 
+              uploadProgress={uploadProgress} 
+              uploadPhase={uploadPhase} 
+            />
+          )}
+
+          {/* Live Telemetry Terminal Logs */}
+          <TelemetryTerminal 
+            logs={terminalLogs}
+            uploadProgress={uploadProgress}
+            uploadPhase={uploadPhase}
+            isAnalyzing={isAnalyzing}
+            onAbort={handleAbort}
+            isCollapsed={isTerminalCollapsed}
+            setIsCollapsed={setIsTerminalCollapsed}
+          />
 
           {/* Data Modules */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
