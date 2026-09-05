@@ -4,7 +4,8 @@ import {
   ArrowRight, Disc,
   Upload, RefreshCw, Mic, CheckCircle2,
   Download, AlertOctagon, Radio,
-  Terminal, FileAudio, ChevronDown, ChevronUp, Loader2
+  Terminal, FileAudio, ChevronDown, ChevronUp, Loader2,
+  ArrowUpRight, Shield, Code2
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -43,7 +44,7 @@ export default function App() {
   }, [checkHealth]);
 
   return (
-    <div className="min-h-screen text-[#f5f5f5] selection:bg-[#CCFF00] selection:text-black font-sans relative bg-[#050505] overflow-x-hidden w-full">
+    <div className="min-h-screen text-[#f5f5f5] selection:bg-[#CCFF00] selection:text-black font-sans relative bg-[#050505] overflow-x-hidden w-full flex flex-col justify-between">
       {/* Global Topo Background */}
       <TopoBackground />
       
@@ -54,11 +55,18 @@ export default function App() {
         onRetryBackend={handleManualRetry}
       />
       
-      <main className="pt-20 sm:pt-24 pb-16 sm:pb-20 px-3 sm:px-6 max-w-7xl mx-auto relative z-10 w-full overflow-x-hidden">
+      <main className="pt-20 sm:pt-24 pb-16 sm:pb-20 px-3 sm:px-6 max-w-7xl mx-auto relative z-10 w-full overflow-x-hidden flex-1">
         {activeView === 'landing' && <LandingPage setActiveView={setActiveView} />}
         {activeView === 'dashboard' && <LiveDashboard backendStatus={backendStatus} onRetryBackend={handleManualRetry} />}
         {activeView === 'technology' && <TechnologyPage />}
+        {activeView === 'about' && <AboutPage setActiveView={setActiveView} />}
       </main>
+
+      <Footer 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+        backendStatus={backendStatus} 
+      />
     </div>
   );
 }
@@ -138,13 +146,19 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
           {/* Mobile compact nav buttons */}
           <div className="md:hidden flex items-center gap-1 shrink-0">
             <button 
-              onClick={() => setActiveView('technology')}
+              onClick={() => { setActiveView('technology'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               className={`font-mono text-[9px] px-1.5 py-0.5 uppercase ${activeView === 'technology' ? 'text-[#CCFF00] border-b border-[#CCFF00]' : 'text-[#888]'}`}
             >
               Arch
             </button>
             <button 
-              onClick={() => setActiveView('dashboard')}
+              onClick={() => { setActiveView('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className={`font-mono text-[9px] px-1.5 py-0.5 uppercase ${activeView === 'about' ? 'text-[#CCFF00] border-b border-[#CCFF00]' : 'text-[#888]'}`}
+            >
+              About
+            </button>
+            <button 
+              onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               className={`font-mono text-[9px] px-2 py-0.5 uppercase font-bold ${activeView === 'dashboard' ? 'bg-[#CCFF00] text-black' : 'text-[#888] border border-[#333]'}`}
             >
               Console
@@ -152,9 +166,10 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
           </div>
 
           <div className="hidden md:flex items-center gap-6">
-            <NavLink label="Platform" active={activeView === 'landing'} onClick={() => setActiveView('landing')} />
-            <NavLink label="Architecture" active={activeView === 'technology'} onClick={() => setActiveView('technology')} />
-            <NavLink label="Console" active={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} isAccent />
+            <NavLink label="Platform" active={activeView === 'landing'} onClick={() => { setActiveView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+            <NavLink label="Architecture" active={activeView === 'technology'} onClick={() => { setActiveView('technology'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+            <NavLink label="About" active={activeView === 'about'} onClick={() => { setActiveView('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+            <NavLink label="Console" active={activeView === 'dashboard'} onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} isAccent />
           </div>
         </div>
       </div>
@@ -1620,5 +1635,535 @@ function TechnologyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* =========================================
+   GITHUB ICON HELPER (Pixel-Perfect SVG)
+   ========================================= */
+function GithubIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+    </svg>
+  );
+}
+
+/* =========================================
+   ABOUT PAGE (Mission, Builders & Research)
+   ========================================= */
+function AboutPage({ setActiveView }) {
+  const builders = [
+    {
+      name: "Bimbok Mukherjee",
+      github: "https://github.com/Bimbok",
+      handle: "@Bimbok",
+      avatar: "https://avatars.githubusercontent.com/u/132834022?v=4",
+      role: "Lead Deep Learning Architect & Systems Engineer",
+      badge: "ARCHITECTURE & TRAINING",
+      bio: "Engineered and trained the PyTorch Multi-Resolution SE-ResNet (v3) detection core. Formulated the 3-channel STFT representation (1024-Mel vocal tract biology, 512-Linear transient phase tracking, 2048-Linear harmonic pitch overtones). Calibrated the focal loss decision boundary with Youden's J statistic (τ* = 0.0509) to achieve 93.66% accuracy and 98.71% ROC-AUC on the FoR benchmark.",
+      skills: ["PyTorch", "TorchAudio", "DSP & Resampling", "FastAPI", "Model Optimization"]
+    },
+    {
+      name: "Aditya Paul",
+      github: "https://github.com/adityapaul26",
+      handle: "@adityapaul26",
+      avatar: "https://avatars.githubusercontent.com/u/180437661?v=4",
+      role: "Core Full-Stack Engineer & Interaction Designer",
+      badge: "UI/UX & TELEMETRY SYSTEMS",
+      bio: "Architected the industrial cyber-brutalist operations console and visual telemetry pipeline. Built the client-side binary audio streaming, Web Audio API hooks, and hardware-accelerated 60 FPS HTML5 Canvas waveform telemetry. Developed the responsive mobile layout, real-time stage progress steppers, and diagnostic audit JSON telemetry exporter.",
+      skills: ["React 19", "Vite", "Tailwind CSS", "Web Audio API", "HTML5 Canvas Telemetry"]
+    },
+    {
+      name: "Bijan Murma",
+      github: "https://github.com/bijanmurmu",
+      handle: "@bijanmurmu",
+      avatar: "https://avatars.githubusercontent.com/u/73417763?v=4",
+      role: "Forensic ML Researcher & Dataset Specialist",
+      badge: "DATASETS & THREAT MODELING",
+      bio: "Curated, cleansed, and balanced the forensic speech benchmark dataset across genuine human recordings and modern zero-shot neural vocoders (HiFi-GAN, VITS, StyleTTS2, Tortoise). Investigated acoustic phase jitter, spectral tilt anomalies, and prosodic stability. Conducted robustness validation against lossy MP3 compression, downsampling, and environmental noise.",
+      skills: ["Acoustic Forensics", "Dataset Curation", "Threat Modeling", "Adversarial Testing"]
+    }
+  ];
+
+  return (
+    <div className="animate-in fade-in duration-700 space-y-12 sm:space-y-16">
+      
+      {/* Hero Header */}
+      <div className="bg-black p-6 sm:p-10 border border-[#1f1f1f] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#CCFF00]/5 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 space-y-4 max-w-4xl">
+          <div className="flex items-center gap-2 font-mono text-xs text-[#CCFF00] tracking-widest uppercase">
+            <span className="w-2 h-2 bg-[#CCFF00] animate-pulse shrink-0" />
+            <span>PROJECT DOSSIER // SIH PROBLEM STATEMENT 26104</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold uppercase tracking-tighter text-white">
+            Engineered To Stop <br />
+            <span className="text-[#888888]">Voice Cloning Attacks</span>
+          </h1>
+
+          <p className="text-sm sm:text-base text-[#aaa] leading-relaxed max-w-2xl font-mono">
+            VocalGuard is an open-source forensic defense system built by a team of three engineers to detect neural voice cloning, vocoder phase anomalies, and synthetic speech impersonations in real time.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2 font-mono text-[10px] sm:text-xs">
+            <span className="px-3 py-1.5 bg-[#111] border border-[#333] text-white">
+              CORE TEAM: 3 BUILDERS
+            </span>
+            <span className="px-3 py-1.5 bg-[#111] border border-[#333] text-[#CCFF00]">
+              EVALUATION: FAKE-OR-REAL (FoR)
+            </span>
+            <span className="px-3 py-1.5 bg-[#111] border border-[#333] text-[#aaa]">
+              INFERENCE: &lt;35MS ON CPU
+            </span>
+            <span className="px-3 py-1.5 bg-[#111] border border-[#333] text-[#aaa]">
+              MODEL WEIGHTS: 12.86 MB
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* The Builders Section */}
+      <div className="space-y-6">
+        <div className="border-b border-[#1f1f1f] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div>
+            <div className="font-mono text-xs text-[#CCFF00] tracking-widest uppercase mb-1">
+              THE ARCHITECTS & DEVELOPERS
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold uppercase tracking-tighter text-white">
+              Core Engineering Team
+            </h2>
+          </div>
+          <p className="font-mono text-xs text-[#666]">
+            3 ENGINEERS // ZERO COMPROMISE
+          </p>
+        </div>
+
+        {/* 3 Builder Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {builders.map((builder) => (
+            <div 
+              key={builder.github} 
+              className="bg-black border border-[#1f1f1f] hover:border-[#CCFF00]/60 transition-all p-6 flex flex-col justify-between group relative overflow-hidden"
+            >
+              <div className="space-y-5">
+                {/* Header with avatar and badge */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="relative">
+                    <img 
+                      src={builder.avatar} 
+                      alt={builder.name} 
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover border-2 border-[#333] group-hover:border-[#CCFF00] transition-colors"
+                    />
+                    <div className="absolute -bottom-1.5 -right-1.5 bg-[#CCFF00] text-black text-[8px] font-mono font-bold px-1 uppercase">
+                      BUILDER
+                    </div>
+                  </div>
+                  <span className="font-mono text-[9px] bg-[#111] text-[#CCFF00] border border-[#333] px-2 py-0.5 uppercase tracking-wider text-right">
+                    {builder.badge}
+                  </span>
+                </div>
+
+                {/* Identity */}
+                <div>
+                  <h3 className="text-xl font-bold text-white uppercase tracking-tight group-hover:text-[#CCFF00] transition-colors">
+                    {builder.name}
+                  </h3>
+                  <a 
+                    href={builder.github} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="font-mono text-xs text-[#888] hover:text-[#CCFF00] inline-flex items-center gap-1 mt-0.5"
+                  >
+                    <span>{builder.handle}</span>
+                    <ArrowUpRight className="w-3 h-3 text-[#666] group-hover:text-[#CCFF00]" />
+                  </a>
+                  <div className="font-mono text-xs text-[#aaa] mt-1 font-semibold">
+                    {builder.role}
+                  </div>
+                </div>
+
+                {/* Bio & Contributions */}
+                <p className="text-xs text-[#777] leading-relaxed font-sans">
+                  {builder.bio}
+                </p>
+
+                {/* Skills tags */}
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {builder.skills.map((skill, sIdx) => (
+                    <span 
+                      key={sIdx} 
+                      className="font-mono text-[10px] bg-[#0c0c0c] text-[#888] border border-[#222] px-2 py-0.5 group-hover:border-[#333] transition-colors"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* GitHub Link Button */}
+              <div className="pt-6 mt-6 border-t border-[#1a1a1a]">
+                <a 
+                  href={builder.github} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="w-full py-2.5 px-4 bg-[#111] hover:bg-[#CCFF00] text-white hover:text-black font-mono text-xs uppercase tracking-wider font-bold border border-[#2a2a2a] hover:border-[#CCFF00] transition-all flex items-center justify-center gap-2"
+                >
+                  <GithubIcon className="w-4 h-4" />
+                  <span>View GitHub Profile</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SIH Problem Statement 26104 Dossier */}
+      <div className="bg-black p-6 sm:p-8 border border-[#1f1f1f] space-y-6">
+        <div className="flex items-center gap-2 font-mono text-xs text-[#CCFF00] tracking-widest uppercase">
+          <Shield className="w-4 h-4 text-[#CCFF00]" />
+          <span>HACKATHON CONTEXT // SMART INDIA HACKATHON 2024</span>
+        </div>
+
+        <h3 className="text-2xl sm:text-3xl font-bold uppercase tracking-tight text-white">
+          Problem Statement 26104: AI Voice Cloning Impersonation Interception
+        </h3>
+
+        <div className="grid md:grid-cols-2 gap-6 text-xs sm:text-sm text-[#888] leading-relaxed">
+          <div className="space-y-3 bg-[#0a0a0a] p-5 border border-[#1a1a1a]">
+            <div className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-[#FF3333]" />
+              The Threat Vector
+            </div>
+            <p>
+              Generative neural voice synthesis models (e.g. ElevenLabs, XTTS, StyleTTS2, Tortoise) can clone an individual's vocal acoustics using as little as 3 seconds of reference speech intercepted from phone calls or social media.
+            </p>
+            <p>
+              These synthetic voices are actively leveraged in high-frequency financial authorization fraud, emergency extortion scams, and CEO wire fraud, where traditional audio verification and human ears fail completely.
+            </p>
+          </div>
+
+          <div className="space-y-3 bg-[#0a0a0a] p-5 border border-[#1a1a1a]">
+            <div className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-[#CCFF00]" />
+              The VocalGuard Engineering Answer
+            </div>
+            <p>
+              Rather than attempting to analyze semantic speech content with heavyweight multi-gigabyte models, VocalGuard evaluates the physical and mathematical acoustics of the audio signal itself.
+            </p>
+            <p>
+              By combining three simultaneous STFT resolutions (Mel formants, linear temporal transients, and harmonic overtones) into anisotropic SE-ResNet convolutions, VocalGuard intercepts vocoder artifacts in under 35 milliseconds on ordinary CPUs.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Architectural Pillars Summary */}
+      <div className="space-y-6">
+        <div className="border-b border-[#1f1f1f] pb-4">
+          <div className="font-mono text-xs text-[#CCFF00] tracking-widest uppercase mb-1">
+            CORE METHODOLOGY
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold uppercase tracking-tighter text-white">
+            Why VocalGuard Outperforms Single-Spectrogram Detectors
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono">
+          <div className="bg-black p-5 border border-[#1f1f1f] space-y-3 border-t-2 border-t-[#CCFF00]">
+            <div className="text-[10px] text-[#CCFF00] uppercase tracking-wider">Pillar 01</div>
+            <div className="text-base font-bold text-white uppercase">Tri-Channel STFT Tensor</div>
+            <p className="text-xs text-[#777] font-sans leading-relaxed">
+              Standard audio detectors feed a single Mel spectrogram, discarding phase transients and fine harmonic combs. VocalGuard constructs a 3-channel tensor (1024-Mel + 512-Linear + 2048-Linear) providing concurrent time and frequency resolution.
+            </p>
+          </div>
+
+          <div className="bg-black p-5 border border-[#1f1f1f] space-y-3 border-t-2 border-t-[#CCFF00]">
+            <div className="text-[10px] text-[#CCFF00] uppercase tracking-wider">Pillar 02</div>
+            <div className="text-base font-bold text-white uppercase">Anisotropic SE-ResNet</div>
+            <p className="text-xs text-[#777] font-sans leading-relaxed">
+              Alternating (5×3) and (3×5) directional convolution filters isolate horizontal pitch harmonics and vertical transient frame boundaries without isotropic blurring. Squeeze-and-Excitation recalibrates channel attention dynamically.
+            </p>
+          </div>
+
+          <div className="bg-black p-5 border border-[#1f1f1f] space-y-3 border-t-2 border-t-[#CCFF00]">
+            <div className="text-[10px] text-[#CCFF00] uppercase tracking-wider">Pillar 03</div>
+            <div className="text-base font-bold text-white uppercase">Calibrated Youden's J</div>
+            <p className="text-xs text-[#777] font-sans leading-relaxed">
+              Trained with Binary Focal Loss (γ=2.0) and calibrated via Youden's J statistic to an optimal threshold of τ* = 0.0509, achieving 93.57% synthetic recall and 93.75% human specificity with 98.71% ROC-AUC on unseen data.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* GitHub Repository Banner & Call to Action */}
+      <div className="bg-black p-6 sm:p-8 border border-[#1f1f1f] flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-2 text-center md:text-left">
+          <div className="font-mono text-xs text-[#CCFF00] uppercase tracking-widest flex items-center gap-2 justify-center md:justify-start">
+            <Code2 className="w-4 h-4 text-[#CCFF00]" />
+            <span>Open Source Project Repository</span>
+          </div>
+          <h4 className="text-xl sm:text-2xl font-bold uppercase text-white">
+            malevolent-shrine-hq / VocalGuard
+          </h4>
+          <p className="text-xs text-[#777] font-mono">
+            Clone and inspect the complete PyTorch training scripts, model checkpoints, and FastAPI gateway.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
+          <a 
+            href="https://github.com/malevolent-shrine-hq/VocalGuard" 
+            target="_blank" 
+            rel="noreferrer"
+            className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
+            <GithubIcon className="w-4 h-4" />
+            <span>Star on GitHub</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </a>
+          <button 
+            onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="btn-outline flex items-center justify-center gap-2 w-full sm:w-auto bg-black"
+          >
+            <span>Launch Console</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+/* =========================================
+   CYBER-INDUSTRIAL FOOTER
+   ========================================= */
+function Footer({ activeView, setActiveView, backendStatus }) {
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateTo = (view) => {
+    setActiveView(view);
+    scrollToTop();
+  };
+
+  return (
+    <footer className="relative z-20 bg-black/95 border-t border-[#1f1f1f] text-[#888] font-sans mt-16 sm:mt-24">
+      {/* Glow highlight line */}
+      <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-[#CCFF00]/40 to-transparent" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12 pb-12 border-b border-[#1a1a1a]">
+          
+          {/* Brand & Mission (lg:col-span-5) */}
+          <div className="lg:col-span-5 space-y-4">
+            <div 
+              className="flex items-center gap-2 cursor-pointer inline-flex"
+              onClick={() => navigateTo('landing')}
+            >
+              <div className="w-5 h-5 bg-[#CCFF00] flex items-center justify-center">
+                <div className="w-1.5 h-1.5 bg-black" />
+              </div>
+              <span className="text-lg font-bold tracking-tighter uppercase text-white font-mono">
+                Vocal<span className="text-[#888]">Guard</span>
+              </span>
+              <span className="font-mono text-[9px] bg-[#111] text-[#CCFF00] border border-[#222] px-1.5 py-0.5 ml-2">
+                DEFENSE ARCHITECTURE
+              </span>
+            </div>
+
+            <p className="text-xs sm:text-sm text-[#777] leading-relaxed max-w-md">
+              Forensic real-time audio deepfake and synthetic voice cloning interception framework. Powered by PyTorch Multi-Resolution SE-ResNet (v3) with 93.66% accuracy and 98.71% ROC-AUC on the Fake-or-Real benchmark.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-[10px]">
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#0d0d0d] border border-[#222] text-[#aaa]">
+                <span className={`w-2 h-2 rounded-full ${backendStatus.online ? 'bg-[#CCFF00] animate-pulse' : 'bg-red-500'}`} />
+                {backendStatus.online ? 'API ONLINE (RENDER)' : 'API STANDBY'}
+              </span>
+              <span className="px-2 py-1 bg-[#0d0d0d] border border-[#222] text-[#888]">
+                SIH PS: 26104
+              </span>
+              <span className="px-2 py-1 bg-[#0d0d0d] border border-[#222] text-[#888]">
+                CALIBRATED τ = 0.0509
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Nav (lg:col-span-2) */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="font-mono text-[11px] uppercase tracking-widest text-white border-b border-[#222] pb-2">
+              System Modules
+            </div>
+            <ul className="space-y-2 text-xs font-mono">
+              <li>
+                <button 
+                  onClick={() => navigateTo('landing')}
+                  className={`hover:text-[#CCFF00] transition-colors uppercase ${activeView === 'landing' ? 'text-[#CCFF00]' : 'text-[#777]'}`}
+                >
+                  // Platform
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => navigateTo('dashboard')}
+                  className={`hover:text-[#CCFF00] transition-colors uppercase ${activeView === 'dashboard' ? 'text-[#CCFF00]' : 'text-[#777]'}`}
+                >
+                  // Live Console
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => navigateTo('technology')}
+                  className={`hover:text-[#CCFF00] transition-colors uppercase ${activeView === 'technology' ? 'text-[#CCFF00]' : 'text-[#777]'}`}
+                >
+                  // Architecture
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => navigateTo('about')}
+                  className={`hover:text-[#CCFF00] transition-colors uppercase flex items-center gap-1.5 ${activeView === 'about' ? 'text-[#CCFF00]' : 'text-[#777]'}`}
+                >
+                  <span>// About & Builders</span>
+                  <span className="text-[9px] bg-[#CCFF00]/10 text-[#CCFF00] px-1 border border-[#CCFF00]/30">TEAM</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Core Builders (lg:col-span-3) */}
+          <div className="lg:col-span-3 space-y-3">
+            <div className="font-mono text-[11px] uppercase tracking-widest text-white border-b border-[#222] pb-2 flex items-center justify-between">
+              <span>The Builders</span>
+              <button 
+                onClick={() => navigateTo('about')}
+                className="text-[9px] text-[#CCFF00] hover:underline uppercase font-mono"
+              >
+                Team Dossier →
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              <a 
+                href="https://github.com/Bimbok" 
+                target="_blank" 
+                rel="noreferrer"
+                className="group flex items-center justify-between p-2 bg-[#0c0c0c] border border-[#1e1e1e] hover:border-[#CCFF00] transition-all"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img 
+                    src="https://avatars.githubusercontent.com/u/132834022?v=4" 
+                    alt="Bimbok Mukherjee" 
+                    className="w-6 h-6 rounded-none border border-[#333] shrink-0" 
+                  />
+                  <div className="truncate">
+                    <div className="text-xs text-white group-hover:text-[#CCFF00] transition-colors font-mono font-medium truncate">
+                      Bimbok Mukherjee
+                    </div>
+                    <div className="text-[10px] text-[#666] font-mono truncate">
+                      Lead Architect & ML
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#555] group-hover:text-[#CCFF00] shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </a>
+
+              <a 
+                href="https://github.com/adityapaul26" 
+                target="_blank" 
+                rel="noreferrer"
+                className="group flex items-center justify-between p-2 bg-[#0c0c0c] border border-[#1e1e1e] hover:border-[#CCFF00] transition-all"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img 
+                    src="https://avatars.githubusercontent.com/u/180437661?v=4" 
+                    alt="Aditya Paul" 
+                    className="w-6 h-6 rounded-none border border-[#333] shrink-0" 
+                  />
+                  <div className="truncate">
+                    <div className="text-xs text-white group-hover:text-[#CCFF00] transition-colors font-mono font-medium truncate">
+                      Aditya Paul
+                    </div>
+                    <div className="text-[10px] text-[#666] font-mono truncate">
+                      Full-Stack & Telemetry
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#555] group-hover:text-[#CCFF00] shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </a>
+
+              <a 
+                href="https://github.com/bijanmurmu" 
+                target="_blank" 
+                rel="noreferrer"
+                className="group flex items-center justify-between p-2 bg-[#0c0c0c] border border-[#1e1e1e] hover:border-[#CCFF00] transition-all"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img 
+                    src="https://avatars.githubusercontent.com/u/73417763?v=4" 
+                    alt="Bijan Murma" 
+                    className="w-6 h-6 rounded-none border border-[#333] shrink-0" 
+                  />
+                  <div className="truncate">
+                    <div className="text-xs text-white group-hover:text-[#CCFF00] transition-colors font-mono font-medium truncate">
+                      Bijan Murma
+                    </div>
+                    <div className="text-[10px] text-[#666] font-mono truncate">
+                      Forensic ML Researcher
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#555] group-hover:text-[#CCFF00] shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Project Spec & GitHub Link (lg:col-span-2) */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="font-mono text-[11px] uppercase tracking-widest text-white border-b border-[#222] pb-2">
+              Source Code
+            </div>
+            <p className="text-[11px] text-[#666] font-mono leading-relaxed">
+              Open-source neural defense implementation for SIH 2024 (Problem Statement 26104).
+            </p>
+            <a 
+              href="https://github.com/malevolent-shrine-hq/VocalGuard" 
+              target="_blank" 
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#CCFF00] text-white text-xs font-mono transition-all w-full justify-center"
+            >
+              <GithubIcon className="w-4 h-4 text-white" />
+              <span>GitHub Repo</span>
+              <ArrowUpRight className="w-3 h-3 text-[#888]" />
+            </a>
+            <button 
+              onClick={scrollToTop}
+              className="text-[10px] font-mono text-[#777] hover:text-[#CCFF00] transition-colors flex items-center gap-1 pt-1"
+            >
+              ↑ Return to Top
+            </button>
+          </div>
+
+        </div>
+
+        {/* Bottom copyright / bar */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[10px] text-[#666]">
+          <div className="flex flex-wrap items-center gap-2 text-center sm:text-left">
+            <span>© 2026 VOCALGUARD FORENSICS</span>
+            <span className="hidden sm:inline text-[#333]">|</span>
+            <span>BUILT BY BIMBOK MUKHERJEE, ADITYA PAUL & BIJAN MURMA</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[#555]">ALL INDIA COUNCIL FOR TECHNICAL EDUCATION (AICTE)</span>
+            <span className="w-1.5 h-1.5 bg-[#CCFF00] rounded-full" />
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 }
