@@ -43,7 +43,7 @@ export default function App() {
   }, [checkHealth]);
 
   return (
-    <div className="min-h-screen text-[#f5f5f5] selection:bg-[#CCFF00] selection:text-black font-sans relative bg-[#050505]">
+    <div className="min-h-screen text-[#f5f5f5] selection:bg-[#CCFF00] selection:text-black font-sans relative bg-[#050505] overflow-x-hidden w-full">
       {/* Global Topo Background */}
       <TopoBackground />
       
@@ -54,7 +54,7 @@ export default function App() {
         onRetryBackend={handleManualRetry}
       />
       
-      <main className="pt-24 pb-20 px-4 sm:px-6 max-w-7xl mx-auto relative z-10">
+      <main className="pt-20 sm:pt-24 pb-16 sm:pb-20 px-3 sm:px-6 max-w-7xl mx-auto relative z-10 w-full overflow-x-hidden">
         {activeView === 'landing' && <LandingPage setActiveView={setActiveView} />}
         {activeView === 'dashboard' && <LiveDashboard backendStatus={backendStatus} onRetryBackend={handleManualRetry} />}
         {activeView === 'technology' && <TechnologyPage />}
@@ -82,27 +82,27 @@ function TopoBackground() {
    ========================================= */
 function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1f1f1f]">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur border-b border-[#1f1f1f]">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
         
         <div 
-          className="flex items-center gap-4 cursor-pointer"
+          className="flex items-center gap-2 sm:gap-4 cursor-pointer shrink-0"
           onClick={() => setActiveView('dashboard')}
         >
-          <div className="w-6 h-6 bg-[#CCFF00] flex items-center justify-center">
-            <div className="w-2 h-2 bg-black" />
+          <div className="w-5 h-5 sm:w-6 sm:h-6 bg-[#CCFF00] flex items-center justify-center shrink-0">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-black" />
           </div>
-          <span className="text-xl font-bold tracking-tighter uppercase text-white">
+          <span className="text-lg sm:text-xl font-bold tracking-tighter uppercase text-white">
             Vocal<span className="text-[#888888] font-light">Guard</span>
           </span>
-          <span className="hidden sm:inline-block font-mono text-[9px] bg-[#111] text-[#888] border border-[#222] px-2 py-0.5">
+          <span className="hidden lg:inline-block font-mono text-[9px] bg-[#111] text-[#888] border border-[#222] px-2 py-0.5">
             MODEL: v3-MULTI-RES-CNN
           </span>
         </div>
         
-        <div className="flex items-center gap-4 md:gap-8">
-          <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase">
-            <span className={`w-2 h-2 rounded-full ${
+        <div className="flex items-center gap-2 sm:gap-4 md:gap-8 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px] sm:text-[10px] tracking-wider uppercase shrink-0">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
               backendStatus.online 
                 ? 'bg-[#CCFF00] animate-pulse' 
                 : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
@@ -112,20 +112,43 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
                 ? 'text-[#888]' 
                 : (backendStatus.checking ? 'text-amber-400' : 'text-[#FF3333]')
             }>
-              {backendStatus.online 
-                ? 'API ONLINE' 
-                : (backendStatus.checking ? 'CHECKING API...' : 'API DISCONNECTED')}
+              <span className="hidden sm:inline">
+                {backendStatus.online 
+                  ? 'API ONLINE' 
+                  : (backendStatus.checking ? 'CHECKING API...' : 'API DISCONNECTED')}
+              </span>
+              <span className="sm:hidden">
+                {backendStatus.online 
+                  ? 'ONLINE' 
+                  : (backendStatus.checking ? 'CHECKING' : 'OFFLINE')}
+              </span>
             </span>
             {!backendStatus.online && (
               <button 
                 onClick={onRetryBackend}
                 disabled={backendStatus.checking}
-                className="ml-1 text-[9px] text-[#CCFF00] hover:underline uppercase tracking-widest border border-[#333] px-1.5 py-0.5 bg-[#111] disabled:opacity-50"
+                className="ml-1 text-[8px] sm:text-[9px] text-[#CCFF00] hover:underline uppercase tracking-widest border border-[#333] px-1 sm:px-1.5 py-0.5 bg-[#111] disabled:opacity-50"
                 title="Retry connecting to backend"
               >
                 Retry
               </button>
             )}
+          </div>
+
+          {/* Mobile compact nav buttons */}
+          <div className="md:hidden flex items-center gap-1 shrink-0">
+            <button 
+              onClick={() => setActiveView('technology')}
+              className={`font-mono text-[9px] px-1.5 py-0.5 uppercase ${activeView === 'technology' ? 'text-[#CCFF00] border-b border-[#CCFF00]' : 'text-[#888]'}`}
+            >
+              Arch
+            </button>
+            <button 
+              onClick={() => setActiveView('dashboard')}
+              className={`font-mono text-[9px] px-2 py-0.5 uppercase font-bold ${activeView === 'dashboard' ? 'bg-[#CCFF00] text-black' : 'text-[#888] border border-[#333]'}`}
+            >
+              Console
+            </button>
           </div>
 
           <div className="hidden md:flex items-center gap-6">
@@ -170,26 +193,26 @@ function LandingPage({ setActiveView }) {
     <div className="animate-in fade-in duration-700">
       
       {/* Hero Layout */}
-      <div className="grid lg:grid-cols-12 gap-12 mt-12 items-center">
+      <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 mt-6 sm:mt-12 items-center">
         
         {/* Left Typography */}
-        <div className="lg:col-span-7 space-y-8">
-          <div className="flex items-center gap-3 font-mono text-xs text-[#CCFF00] tracking-widest uppercase">
-            <span className="w-2 h-2 bg-[#CCFF00] animate-pulse" />
-            PyTorch Multi-Domain Spectrogram CNN // Online
+        <div className="lg:col-span-7 space-y-6 sm:space-y-8">
+          <div className="flex items-center gap-2 sm:gap-3 font-mono text-[10px] sm:text-xs text-[#CCFF00] tracking-widest uppercase">
+            <span className="w-2 h-2 bg-[#CCFF00] animate-pulse shrink-0" />
+            <span className="truncate">PyTorch Multi-Domain Spectrogram CNN // Online</span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1.05] uppercase text-white">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter leading-[1.05] uppercase text-white">
             Detect Voice <br/>
             <span className="text-[#888888]">Deepfakes</span><br/>
             In Real Time.
           </h1>
           
-          <p className="text-[#888888] text-lg max-w-xl leading-relaxed">
+          <p className="text-[#888888] text-base sm:text-lg max-w-xl leading-relaxed">
             Stop synthetic voice fraud before authorization. Our PyTorch multi-resolution spectrogram neural network detects high-frequency neural vocoder artifacts, prosodic phase shifts, and AI text-to-speech clones in milliseconds.
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
             <button onClick={() => setActiveView('dashboard')} className="btn-primary flex items-center justify-center gap-3">
               Open Analysis Console <ArrowRight className="w-4 h-4" />
             </button>
@@ -200,13 +223,13 @@ function LandingPage({ setActiveView }) {
         </div>
         
         {/* Right Side: Neural Flow Widget */}
-        <div className="lg:col-span-5 h-[500px]">
+        <div className="lg:col-span-5 h-[340px] sm:h-[420px] lg:h-[500px] w-full overflow-hidden">
           <NeuralWidget />
         </div>
       </div>
 
       {/* Grid Features */}
-      <div className="grid md:grid-cols-3 gap-0 mt-32 border border-[#1f1f1f] bg-black">
+      <div className="grid md:grid-cols-3 gap-0 mt-16 sm:mt-32 border border-[#1f1f1f] bg-black">
         <GridFeature 
           title="Multi-STFT Spectrograms" 
           desc="Combines 512, 1024, and 2048 STFT windows into a 3-channel feature map to expose neural vocoder phase discrepancies."
@@ -325,7 +348,7 @@ function PipelineStepper({ activeStage, uploadProgress, uploadPhase }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[10px] uppercase tracking-wider">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[9px] sm:text-[10px] uppercase tracking-wider w-full">
       {stages.map((st, idx) => {
         const stageNum = idx + 1;
         const isDone = activeStage > stageNum || activeStage === 5;
@@ -333,7 +356,9 @@ function PipelineStepper({ activeStage, uploadProgress, uploadPhase }) {
         return (
           <div 
             key={st.num}
-            className={`p-2.5 border transition-all ${
+            className={`p-2 sm:p-2.5 border transition-all ${
+              idx === 4 ? 'col-span-2 sm:col-span-1' : ''
+            } ${
               isActive 
                 ? 'border-[#CCFF00] bg-[#CCFF00]/10 text-white shadow-[0_0_8px_rgba(204,255,0,0.15)]' 
                 : (isDone 
@@ -341,15 +366,15 @@ function PipelineStepper({ activeStage, uploadProgress, uploadPhase }) {
                     : 'border-[#1a1a1a] bg-[#050505] text-[#555]')
             }`}
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className={`text-[9px] font-bold ${isActive ? 'text-[#CCFF00]' : (isDone ? 'text-[#888]' : 'text-[#555]')}`}>
+            <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+              <span className={`text-[8px] sm:text-[9px] font-bold ${isActive ? 'text-[#CCFF00]' : (isDone ? 'text-[#888]' : 'text-[#555]')}`}>
                 STAGE {st.num}
               </span>
-              {isDone && <span className="text-[#CCFF00] text-[10px] font-bold">✓</span>}
+              {isDone && <span className="text-[#CCFF00] text-[9px] sm:text-[10px] font-bold">✓</span>}
               {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] animate-ping" />}
             </div>
-            <div className="font-bold truncate text-[11px] text-white">{st.name}</div>
-            <div className={`text-[9px] truncate mt-0.5 ${isActive ? 'text-[#CCFF00]' : 'text-[#666]'}`}>{st.desc}</div>
+            <div className="font-bold truncate text-[10px] sm:text-[11px] text-white">{st.name}</div>
+            <div className={`text-[8px] sm:text-[9px] truncate mt-0.5 ${isActive ? 'text-[#CCFF00]' : 'text-[#666]'}`}>{st.desc}</div>
           </div>
         );
       })}
@@ -367,31 +392,31 @@ function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onA
   }, [logs]);
 
   return (
-    <div className="tech-panel bg-black border border-[#1f1f1f]">
+    <div className="tech-panel bg-black border border-[#1f1f1f] w-full overflow-hidden">
       {/* Terminal Header */}
-      <div className="px-4 py-2.5 bg-[#080808] border-b border-[#1f1f1f] flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase text-[#f5f5f5]">
-          <Terminal className="w-3.5 h-3.5 text-[#CCFF00]" />
-          <span>TELEMETRY STREAM // PIPELINE_EXECUTION_LOGS</span>
+      <div className="px-3 sm:px-4 py-2 sm:py-2.5 bg-[#080808] border-b border-[#1f1f1f] flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px] sm:text-[10px] tracking-wider uppercase text-[#f5f5f5] min-w-0">
+          <Terminal className="w-3.5 h-3.5 text-[#CCFF00] shrink-0" />
+          <span className="truncate">TELEMETRY STREAM // PIPELINE LOGS</span>
           {isAnalyzing && (
-            <span className="ml-2 px-1.5 py-0.5 bg-[#CCFF00]/10 text-[#CCFF00] border border-[#CCFF00]/30 text-[9px] animate-pulse">
-              {uploadPhase === 'uploading' ? `UPLOADING ${uploadProgress}%` : 'INFERENCE_BUSY'}
+            <span className="ml-1 sm:ml-2 px-1.5 py-0.5 bg-[#CCFF00]/10 text-[#CCFF00] border border-[#CCFF00]/30 text-[8px] sm:text-[9px] animate-pulse shrink-0">
+              {uploadPhase === 'uploading' ? `${uploadProgress}%` : 'BUSY'}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {isAnalyzing && (
             <button
               onClick={onAbort}
-              className="font-mono text-[9px] uppercase tracking-widest text-[#FF3333] border border-[#FF3333]/40 hover:bg-[#FF3333] hover:text-black px-2 py-0.5 transition-colors"
+              className="font-mono text-[8px] sm:text-[9px] uppercase tracking-widest text-[#FF3333] border border-[#FF3333]/40 hover:bg-[#FF3333] hover:text-black px-1.5 sm:px-2 py-0.5 transition-colors"
             >
-              [ Abort Stream ]
+              [ Abort ]
             </button>
           )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="font-mono text-[10px] text-[#888] hover:text-white flex items-center gap-1"
+            className="font-mono text-[9px] sm:text-[10px] text-[#888] hover:text-white flex items-center gap-1"
           >
             {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
             <span>{isCollapsed ? 'EXPAND' : 'COLLAPSE'}</span>
@@ -401,9 +426,9 @@ function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onA
 
       {/* Terminal Body */}
       {!isCollapsed && (
-        <div className="p-3 bg-[#030303] font-mono text-[11px] h-48 overflow-y-auto space-y-1.5 select-text selection:bg-[#CCFF00] selection:text-black">
+        <div className="p-2.5 sm:p-3 bg-[#030303] font-mono text-[10px] sm:text-[11px] h-48 overflow-y-auto space-y-1.5 select-text selection:bg-[#CCFF00] selection:text-black">
           {logs.length === 0 ? (
-            <div className="text-[#555] py-4 text-center">
+            <div className="text-[#555] py-4 text-center text-[10px] sm:text-[11px]">
               Awaiting audio stream input to initialize neural telemetry buffer...
             </div>
           ) : (
@@ -417,12 +442,12 @@ function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onA
               if (log.tag === 'ERROR' || log.tag === 'ABORT') tagColor = 'text-[#FF3333] border-[#FF3333]/40 bg-[#FF3333]/10';
 
               return (
-                <div key={log.id} className="leading-relaxed flex items-start gap-2">
-                  <span className="text-[#555] select-none shrink-0">[{log.time}]</span>
-                  <span className={`px-1.5 py-0.5 border text-[9px] shrink-0 ${tagColor}`}>
+                <div key={log.id} className="leading-relaxed flex items-start gap-1.5 sm:gap-2 break-all sm:break-normal">
+                  <span className="text-[#555] select-none shrink-0 text-[9px] sm:text-[10px]">[{log.time}]</span>
+                  <span className={`px-1 sm:px-1.5 py-0.5 border text-[8px] sm:text-[9px] shrink-0 ${tagColor}`}>
                     {log.tag}
                   </span>
-                  <span className={log.type === 'danger' ? 'text-[#FF3333]' : (log.type === 'success' ? 'text-white' : 'text-[#bbb]')}>
+                  <span className={`break-words min-w-0 ${log.type === 'danger' ? 'text-[#FF3333]' : (log.type === 'success' ? 'text-white' : 'text-[#bbb]')}`}>
                     {log.msg}
                   </span>
                 </div>
@@ -432,7 +457,7 @@ function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onA
           {isAnalyzing && (
             <div className="flex items-center gap-2 text-[#CCFF00] animate-pulse pt-1">
               <span className="inline-block w-2 h-3.5 bg-[#CCFF00]" />
-              <span className="text-[10px]">PROCESSING PIPELINE...</span>
+              <span className="text-[9px] sm:text-[10px]">PROCESSING PIPELINE...</span>
             </div>
           )}
           <div ref={terminalBottomRef} />
@@ -796,14 +821,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       {audioUrl && <audio ref={audioRef} src={audioUrl} preload="auto" />}
 
       {!backendStatus.online && !backendStatus.checking && (
-        <div className="mb-6 p-3.5 bg-[#FF3333]/10 border border-[#FF3333] text-[#FF3333] font-mono text-xs flex items-center justify-between">
+        <div className="mb-4 sm:mb-6 p-3 sm:p-3.5 bg-[#FF3333]/10 border border-[#FF3333] text-[#FF3333] font-mono text-[11px] sm:text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>Backend offline: Server might be in cold-start sleep mode (takes ~30s on free tiers).</span>
           </div>
           <button 
             onClick={onRetryBackend} 
-            className="underline hover:text-white px-2 py-0.5 border border-[#FF3333]/40 bg-black uppercase tracking-wider text-[10px]"
+            className="underline hover:text-white px-2 py-0.5 border border-[#FF3333]/40 bg-black uppercase tracking-wider text-[9px] sm:text-[10px] shrink-0"
           >
             Reconnect
           </button>
@@ -811,42 +836,47 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       )}
 
       {backendStatus.checking && (
-        <div className="mb-6 p-3 bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-xs flex items-center gap-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          <span>Connecting to VocalGuard neural inference backend...</span>
+        <div className="mb-4 sm:mb-6 p-2.5 sm:p-3 bg-amber-400/10 border border-amber-400/30 text-amber-400 font-mono text-[11px] sm:text-xs flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+          <span className="truncate">Connecting to VocalGuard neural inference backend...</span>
         </div>
       )}
       
       {/* Top Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-[#1f1f1f] pb-6 gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tighter uppercase text-white">Operations Console</h2>
-            <span className="font-mono text-xs bg-[#111] text-[#CCFF00] border border-[#222] px-2 py-0.5">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 border-b border-[#1f1f1f] pb-4 sm:pb-6 gap-3 sm:gap-4 w-full">
+        <div className="min-w-0 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tighter uppercase text-white">Operations Console</h2>
+            <span className="font-mono text-[10px] sm:text-xs bg-[#111] text-[#CCFF00] border border-[#222] px-2 py-0.5">
               LIVE INFERENCE
             </span>
           </div>
-          <div className="flex flex-wrap gap-4 mt-2 font-mono text-xs text-[#888888]">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 font-mono text-[10px] sm:text-xs text-[#888888] min-w-0">
             <span>MODEL: voice_deepfake_detector.pth</span>
             <span>THRESHOLD: 5.09%</span>
-            <span>INPUT: {fileName ? fileName : (isRecording ? 'LIVE_STREAM' : 'STANDBY')}</span>
+            <div className="flex items-center gap-1 min-w-0 max-w-full">
+              <span className="shrink-0">INPUT:</span>
+              <span className="truncate max-w-[180px] xs:max-w-[240px] sm:max-w-xs text-white" title={fileName}>
+                {fileName ? fileName : (isRecording ? 'LIVE_STREAM' : 'STANDBY')}
+              </span>
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="w-full md:w-auto flex items-center">
           {/* Status Indicator */}
-          <div className={`flex items-center gap-3 tech-panel px-4 py-2 bg-black border ${
+          <div className={`flex items-center justify-center gap-2 sm:gap-3 tech-panel px-3 sm:px-4 py-2 bg-black border w-full md:w-auto ${
             status === 'danger' ? 'border-[#FF3333]' : 
             status === 'safe' ? 'border-[#CCFF00]' : 
             status === 'analyzing' ? 'border-[#CCFF00]' : 'border-[#333]'
           }`}>
-            <div className={`w-2 h-2 rounded-full ${
+            <div className={`w-2 h-2 rounded-full shrink-0 ${
               status === 'danger' ? 'bg-[#FF3333] animate-ping' : 
               status === 'safe' ? 'bg-[#CCFF00]' : 
               status === 'analyzing' ? 'bg-[#CCFF00] animate-pulse' : 
               isRecording ? 'bg-[#FF3333] animate-pulse' : 'bg-[#555]'
             }`} />
-            <span className="font-mono text-xs tracking-widest uppercase text-white">
+            <span className="font-mono text-[10px] sm:text-xs tracking-widest uppercase text-white truncate text-center">
               {status === 'danger' && 'THREAT DETECTED'}
               {status === 'safe' && 'VOICE VERIFIED (REAL)'}
               {status === 'analyzing' && (uploadPhase === 'uploading' ? `UPLOADING (${uploadProgress}%)` : 'PROCESSING MULTI-STFT...')}
@@ -858,32 +888,32 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       </div>
 
       {/* Demo Samples Quick Bar */}
-      <div className="mb-6 p-4 tech-panel bg-[#0a0a0a] border-[#222] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 font-mono text-xs text-[#888]">
+      <div className="mb-6 p-3 sm:p-4 tech-panel bg-[#0a0a0a] border-[#222] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 w-full">
+        <div className="flex items-center gap-2 font-mono text-[10px] sm:text-xs text-[#888] shrink-0">
           <Radio className="w-3.5 h-3.5 text-[#CCFF00]" />
           <span>INSTANT DEMO SAMPLES:</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-1 xs:grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={() => handleLoadSample('/samples/real_human_voice.m4a', 'real_human_voice.m4a')}
             disabled={isAnalyzing || isRecording}
-            className="font-mono text-[11px] tracking-wider uppercase px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#CCFF00] transition-colors flex items-center gap-1.5"
+            className="font-mono text-[10px] sm:text-[11px] tracking-wider uppercase px-2.5 sm:px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#CCFF00] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            <CheckCircle2 className="w-3 h-3 text-[#CCFF00]" /> Real Human Sample
+            <CheckCircle2 className="w-3 h-3 text-[#CCFF00] shrink-0" /> Real Human
           </button>
           <button
             onClick={() => handleLoadSample('/samples/ai_synthetic_voicemaker.mp3', 'ai_synthetic_voicemaker.mp3')}
             disabled={isAnalyzing || isRecording}
-            className="font-mono text-[11px] tracking-wider uppercase px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#FF3333] transition-colors flex items-center gap-1.5"
+            className="font-mono text-[10px] sm:text-[11px] tracking-wider uppercase px-2.5 sm:px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#FF3333] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            <AlertTriangle className="w-3 h-3 text-[#FF3333]" /> AI Voicemaker TTS
+            <AlertTriangle className="w-3 h-3 text-[#FF3333] shrink-0" /> Voicemaker TTS
           </button>
           <button
             onClick={() => handleLoadSample('/samples/ai_generated_speech.mp3', 'ai_generated_speech.mp3')}
             disabled={isAnalyzing || isRecording}
-            className="font-mono text-[11px] tracking-wider uppercase px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#FF3333] transition-colors flex items-center gap-1.5"
+            className="font-mono text-[10px] sm:text-[11px] tracking-wider uppercase px-2.5 sm:px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#FF3333] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            <AlertOctagon className="w-3 h-3 text-[#FF3333]" /> AI Synthetic Speech
+            <AlertOctagon className="w-3 h-3 text-[#FF3333] shrink-0" /> Synthetic Speech
           </button>
         </div>
       </div>
@@ -906,28 +936,28 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
             }}
           >
             {/* Header controls inside visualizer */}
-            <div className="border-b border-[#1f1f1f] px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-[#050505] gap-4">
-              <div className="font-mono text-[10px] sm:text-xs text-[#f5f5f5] flex items-center gap-3 truncate max-w-full">
+            <div className="border-b border-[#1f1f1f] px-3 sm:px-6 py-3 sm:py-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-[#050505] gap-3 sm:gap-4 w-full">
+              <div className="font-mono text-[10px] sm:text-xs text-[#f5f5f5] flex items-center gap-2 sm:gap-3 min-w-0 max-w-full">
                 <Disc className="w-4 h-4 text-[#888888] shrink-0" />
-                <span className="truncate">
+                <span className="truncate max-w-[190px] xs:max-w-[240px] sm:max-w-xs md:max-w-sm" title={fileName}>
                   {fileName ? `ACTIVE: ${fileName}` : (isRecording ? 'STREAM: MICROPHONE_BUFFER' : 'SOURCE: WAITING FOR AUDIO')}
                 </span>
                 {uploadMetrics.fileSizeStr && (
-                  <span className="hidden sm:inline-block text-[9px] px-2 py-0.5 bg-[#1a1a1a] text-[#aaa] border border-[#333]">
+                  <span className="shrink-0 text-[9px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#aaa] border border-[#333]">
                     {uploadMetrics.fileSizeStr}
                   </span>
                 )}
               </div>
               
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
                 {/* Audio Playback button if file exists */}
                 {audioUrl && !isRecording && (
                   <button
                     onClick={togglePlayback}
-                    className="font-mono text-[10px] tracking-widest uppercase bg-[#1a1a1a] border border-[#333] text-white px-3 py-2 hover:border-white transition-colors flex items-center gap-2"
+                    className="font-mono text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest uppercase bg-[#1a1a1a] border border-[#333] text-white px-2.5 sm:px-3 py-2 hover:border-white transition-colors flex items-center justify-center gap-1.5"
                   >
-                    {isPlaying ? <Square className="w-3 h-3 fill-white" /> : <Play className="w-3 h-3 fill-white" />}
-                    {isPlaying ? 'Pause Audio' : 'Play Audio'}
+                    {isPlaying ? <Square className="w-3 h-3 fill-white shrink-0" /> : <Play className="w-3 h-3 fill-white shrink-0" />}
+                    {isPlaying ? 'Pause' : 'Play'}
                   </button>
                 )}
 
@@ -936,22 +966,22 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                   <button 
                     onClick={startRecording}
                     disabled={isAnalyzing}
-                    className="font-mono text-[10px] tracking-widest uppercase bg-[#111] border border-[#333] text-[#f5f5f5] px-4 py-2 hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors flex items-center gap-2 disabled:opacity-50"
+                    className="font-mono text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest uppercase bg-[#111] border border-[#333] text-[#f5f5f5] px-2.5 sm:px-4 py-2 hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    <Mic className="w-3 h-3" /> Record Mic
+                    <Mic className="w-3 h-3 shrink-0" /> Record Mic
                   </button>
                 ) : (
                   <button 
                     onClick={stopRecording}
-                    className="font-mono text-[10px] tracking-widest uppercase bg-[#FF3333] text-black px-4 py-2 hover:bg-white transition-colors flex items-center gap-2 animate-pulse"
+                    className="col-span-2 sm:col-span-1 font-mono text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest uppercase bg-[#FF3333] text-black px-3 sm:px-4 py-2 hover:bg-white transition-colors flex items-center justify-center gap-1.5 animate-pulse"
                   >
-                    <Square className="w-3 h-3 fill-black" /> Stop & Analyze ({recordSeconds}s)
+                    <Square className="w-3 h-3 fill-black shrink-0" /> Stop ({recordSeconds}s)
                   </button>
                 )}
                 
                 {/* Upload Button */}
-                <label className="font-mono text-[10px] tracking-widest uppercase bg-white text-black px-4 py-2 hover:bg-[#CCFF00] transition-colors flex items-center gap-2 cursor-pointer">
-                  <Upload className="w-3 h-3" /> Upload Audio
+                <label className="font-mono text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest uppercase bg-white text-black px-2.5 sm:px-4 py-2 hover:bg-[#CCFF00] transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3 h-3 shrink-0" /> Upload Audio
                   <input 
                     type="file" 
                     accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.webm" 
@@ -963,9 +993,9 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                 {(status === 'danger' || status === 'safe' || status === 'error' || isAnalyzing) && (
                   <button 
                     onClick={handleReset}
-                    className="font-mono text-[10px] tracking-widest uppercase bg-[#111] border border-[#333] text-[#f5f5f5] px-4 py-2 hover:border-white hover:text-white transition-colors flex items-center gap-2"
+                    className="font-mono text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest uppercase bg-[#111] border border-[#333] text-[#f5f5f5] px-2.5 sm:px-4 py-2 hover:border-white hover:text-white transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <RefreshCw className="w-3 h-3" /> Reset
+                    <RefreshCw className="w-3 h-3 shrink-0" /> Reset
                   </button>
                 )}
               </div>
@@ -973,22 +1003,22 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
 
             {/* Dynamic In-Flight Progress Bar for Uploads */}
             {uploadPhase === 'uploading' && (
-              <div className="p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] space-y-2">
-                <div className="flex justify-between items-center font-mono text-xs">
-                  <div className="flex items-center gap-2 text-[#CCFF00]">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span className="font-bold uppercase tracking-wider">UPLOADING AUDIO STREAM</span>
+              <div className="p-3 sm:p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] space-y-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center font-mono text-[11px] sm:text-xs gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-[#CCFF00]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="font-bold uppercase tracking-wider text-[10px] sm:text-xs">UPLOADING AUDIO STREAM</span>
                     <span className="text-white">({uploadProgress}%)</span>
                   </div>
-                  <div className="text-[11px] text-[#aaa]">
+                  <div className="text-[10px] sm:text-[11px] text-[#aaa]">
                     <span>{uploadMetrics.loadedBytes ? formatBytes(uploadMetrics.loadedBytes) : '0 B'}</span>
                     <span className="text-[#666]"> / </span>
                     <span className="text-white font-bold">{uploadMetrics.fileSizeStr || '—'}</span>
-                    {uploadMetrics.speedStr && <span className="ml-2 text-[#CCFF00]">[{uploadMetrics.speedStr}]</span>}
+                    {uploadMetrics.speedStr && <span className="ml-1 sm:ml-2 text-[#CCFF00]">[{uploadMetrics.speedStr}]</span>}
                   </div>
                 </div>
                 
-                <div className="w-full bg-[#151515] h-2.5 overflow-hidden border border-[#222]">
+                <div className="w-full bg-[#151515] h-2 sm:h-2.5 overflow-hidden border border-[#222]">
                   <div 
                     className="h-full bg-gradient-to-r from-[#CCFF00]/80 to-[#CCFF00] transition-all duration-150 shadow-[0_0_12px_rgba(204,255,0,0.5)]" 
                     style={{ width: `${uploadProgress}%` }}
@@ -998,13 +1028,13 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
             )}
 
             {uploadPhase === 'processing' && (
-              <div className="p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] space-y-2">
-                <div className="flex justify-between items-center font-mono text-xs">
-                  <div className="flex items-center gap-2 text-[#CCFF00]">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span className="font-bold uppercase tracking-wider">PAYLOAD UPLOADED — INFERENCE IN PROGRESS</span>
+              <div className="p-3 sm:p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] space-y-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center font-mono text-[11px] sm:text-xs gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-[#CCFF00]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="font-bold uppercase tracking-wider text-[10px] sm:text-xs">PAYLOAD UPLOADED — INFERENCE IN PROGRESS</span>
                   </div>
-                  <div className="text-[10px] text-[#CCFF00] uppercase tracking-widest">
+                  <div className="text-[9px] sm:text-[10px] text-[#CCFF00] uppercase tracking-widest">
                     [ PYTORCH MULTI-STFT CNN ]
                   </div>
                 </div>
@@ -1016,39 +1046,39 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
             )}
 
             {/* Brutalist Waveform & Visualizer */}
-            <div className="h-72 p-6 flex flex-col justify-center relative overflow-hidden bg-black">
+            <div className="h-64 sm:h-72 p-3 sm:p-6 flex flex-col justify-center relative overflow-hidden bg-black w-full max-w-full">
               
               {/* Drag & drop overlay */}
               {isDragging && (
-                <div className="absolute inset-0 z-30 bg-black/90 border-2 border-dashed border-[#CCFF00] flex flex-col items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-150">
-                  <Upload className="w-12 h-12 text-[#CCFF00] animate-bounce mb-3" />
-                  <div className="font-mono text-base font-bold text-white uppercase tracking-widest">
+                <div className="absolute inset-0 z-30 bg-black/90 border-2 border-dashed border-[#CCFF00] flex flex-col items-center justify-center p-4 sm:p-6 backdrop-blur-sm animate-in fade-in duration-150">
+                  <Upload className="w-10 h-10 sm:w-12 sm:h-12 text-[#CCFF00] animate-bounce mb-2 sm:mb-3" />
+                  <div className="font-mono text-sm sm:text-base font-bold text-white uppercase tracking-widest text-center">
                     Drop Audio File To Inspect
                   </div>
-                  <div className="font-mono text-xs text-[#888] mt-1">
+                  <div className="font-mono text-[10px] sm:text-xs text-[#888] mt-1 text-center">
                     Accepts .wav, .mp3, .m4a, .aac, .ogg, .flac, .webm (Universal Decoders)
                   </div>
                 </div>
               )}
 
               {/* Background grid lines */}
-              <div className="absolute inset-0 flex flex-col justify-between py-6 pointer-events-none opacity-20">
+              <div className="absolute inset-0 flex flex-col justify-between py-4 sm:py-6 pointer-events-none opacity-20">
                 <div className="w-full border-t border-dashed border-[#888888]" />
                 <div className="w-full border-t border-dashed border-[#888888]" />
                 <div className="w-full border-t border-dashed border-[#888888]" />
               </div>
 
               {status === 'idle' && !isRecording ? (
-                <div className="text-center font-mono text-[#555] tracking-widest uppercase text-sm space-y-2">
+                <div className="text-center font-mono text-[#555] tracking-widest uppercase text-xs sm:text-sm space-y-1.5 sm:space-y-2 px-2">
                   <div className="flex items-center justify-center gap-2 text-[#777]">
-                    <FileAudio className="w-4 h-4" />
+                    <FileAudio className="w-4 h-4 shrink-0" />
                     <span>Drop audio file or record speech to inspect</span>
                   </div>
-                  <div className="text-xs text-[#444]">Supports .wav, .mp3, .m4a, .aac, .flac, .ogg, .webm</div>
+                  <div className="text-[10px] sm:text-xs text-[#444]">Supports .wav, .mp3, .m4a, .aac, .flac, .ogg, .webm</div>
                 </div>
               ) : (
-                <div className="flex items-center gap-[2px] h-36 w-full justify-center">
-                  {[...Array(72)].map((_, i) => {
+                <div className="flex items-center justify-center gap-0.5 sm:gap-1 md:gap-[2px] h-32 sm:h-36 w-full max-w-full overflow-hidden px-1 sm:px-2">
+                  {[...Array(48)].map((_, i) => {
                     const isDanger = status === 'danger';
                     const isSafe = status === 'safe';
                     const activeBar = isAnalyzing || isPlaying || isRecording;
@@ -1061,7 +1091,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                     return (
                       <div 
                         key={i} 
-                        className={`w-2 transition-all duration-150 ${
+                        className={`w-1 xs:w-1.5 sm:w-2 shrink-0 transition-all duration-150 ${
                           isDanger ? 'bg-[#FF3333]' : 
                           isSafe ? 'bg-[#CCFF00]' : 
                           isRecording ? 'bg-[#FF3333]' : 'bg-[#CCFF00]'
@@ -1078,14 +1108,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               
               {/* Alert Overlays */}
               {status === 'danger' && (
-                <div className="absolute inset-0 bg-[#FF3333]/15 flex items-center justify-center backdrop-blur-[2px] animate-in fade-in duration-300">
-                   <div className="bg-black border-2 border-[#FF3333] p-5 flex items-center gap-4 max-w-md shadow-2xl">
-                     <AlertTriangle className="w-8 h-8 text-[#FF3333] shrink-0 animate-bounce" />
-                     <div>
-                       <div className="font-mono font-bold text-base text-[#FF3333] tracking-widest uppercase">
+                <div className="absolute inset-0 bg-[#FF3333]/15 flex items-center justify-center backdrop-blur-[2px] p-3 animate-in fade-in duration-300">
+                   <div className="bg-black border-2 border-[#FF3333] p-3 sm:p-5 flex items-center gap-3 sm:gap-4 max-w-[94%] sm:max-w-md shadow-2xl">
+                     <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-[#FF3333] shrink-0 animate-bounce" />
+                     <div className="min-w-0">
+                       <div className="font-mono font-bold text-xs sm:text-base text-[#FF3333] tracking-wider sm:tracking-widest uppercase truncate sm:whitespace-normal">
                          🚨 SYNTHETIC MATCH DETECTED
                        </div>
-                       <div className="font-mono text-xs text-[#ccc] mt-1">
+                       <div className="font-mono text-[10px] sm:text-xs text-[#ccc] mt-0.5 sm:mt-1 leading-snug">
                          High confidence of AI text-to-speech / neural vocoder generation.
                        </div>
                      </div>
@@ -1094,14 +1124,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               )}
 
               {status === 'safe' && (
-                <div className="absolute inset-0 bg-[#CCFF00]/10 flex items-center justify-center backdrop-blur-[2px] animate-in fade-in duration-300">
-                   <div className="bg-black border-2 border-[#CCFF00] p-5 flex items-center gap-4 max-w-md shadow-2xl">
-                     <CheckCircle2 className="w-8 h-8 text-[#CCFF00] shrink-0" />
-                     <div>
-                       <div className="font-mono font-bold text-base text-[#CCFF00] tracking-widest uppercase">
+                <div className="absolute inset-0 bg-[#CCFF00]/10 flex items-center justify-center backdrop-blur-[2px] p-3 animate-in fade-in duration-300">
+                   <div className="bg-black border-2 border-[#CCFF00] p-3 sm:p-5 flex items-center gap-3 sm:gap-4 max-w-[94%] sm:max-w-md shadow-2xl">
+                     <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-[#CCFF00] shrink-0" />
+                     <div className="min-w-0">
+                       <div className="font-mono font-bold text-xs sm:text-base text-[#CCFF00] tracking-wider sm:tracking-widest uppercase truncate sm:whitespace-normal">
                          ✅ VERIFIED HUMAN VOICE
                        </div>
-                       <div className="font-mono text-xs text-[#ccc] mt-1">
+                       <div className="font-mono text-[10px] sm:text-xs text-[#ccc] mt-0.5 sm:mt-1 leading-snug">
                          Authentic acoustic harmonics confirmed. No deepfake anomalies.
                        </div>
                      </div>
@@ -1110,12 +1140,12 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               )}
 
               {status === 'error' && (
-                <div className="absolute inset-0 bg-[#FF3333]/20 flex items-center justify-center backdrop-blur-[2px]">
-                   <div className="bg-black border border-[#FF3333] p-4 text-center max-w-md">
+                <div className="absolute inset-0 bg-[#FF3333]/20 flex items-center justify-center backdrop-blur-[2px] p-3">
+                   <div className="bg-black border border-[#FF3333] p-3 sm:p-4 text-center max-w-[94%] sm:max-w-md">
                      <div className="font-mono font-bold text-xs text-[#FF3333] tracking-widest uppercase mb-1">
                        Inference Failed
                      </div>
-                     <div className="font-mono text-[11px] text-[#aaa]">
+                     <div className="font-mono text-[10px] sm:text-[11px] text-[#aaa] break-words">
                        {errorMessage}
                      </div>
                    </div>
@@ -1125,12 +1155,12 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
 
             {/* Audio Info Strip */}
             {detectionData && (
-              <div className="border-t border-[#1f1f1f] bg-[#070707] px-6 py-3 flex flex-wrap items-center justify-between gap-4 font-mono text-[11px] text-[#888]">
+              <div className="border-t border-[#1f1f1f] bg-[#070707] px-3 sm:px-6 py-2.5 sm:py-3 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-between gap-2 sm:gap-4 font-mono text-[10px] sm:text-[11px] text-[#888]">
                 <div>DURATION: <span className="text-white">{detectionData.audio_metrics?.duration_seconds}s</span></div>
                 <div>WINDOWS: <span className="text-white">{detectionData.audio_metrics?.windows_analyzed}</span></div>
                 <div>PEAK AMP: <span className="text-white">{detectionData.audio_metrics?.peak_amplitude}</span></div>
                 <div>SPECTRAL CENTROID: <span className="text-white">{detectionData.audio_metrics?.spectral_centroid_hz} Hz</span></div>
-                <div>LATENCY: <span className="text-[#CCFF00]">{detectionData.latency_ms} ms</span></div>
+                <div className="col-span-2 sm:col-span-1">LATENCY: <span className="text-[#CCFF00]">{detectionData.latency_ms} ms</span></div>
               </div>
             )}
           </div>
@@ -1156,7 +1186,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           />
 
           {/* Data Modules */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
             <DataModule 
               title="Spectral Align" 
               value={
@@ -1197,16 +1227,16 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
 
           {/* Sliding Window Breakdown (if multi-window) */}
           {detectionData && detectionData.windows && detectionData.windows.length > 1 && (
-            <div className="tech-panel bg-black p-5 border border-[#1f1f1f]">
-              <div className="font-mono text-xs tracking-widest uppercase text-[#888888] mb-3 flex items-center justify-between">
+            <div className="tech-panel bg-black p-3.5 sm:p-5 border border-[#1f1f1f]">
+              <div className="font-mono text-[11px] sm:text-xs tracking-widest uppercase text-[#888888] mb-3 flex flex-wrap items-center justify-between gap-2">
                 <span>Multi-Window Temporal Analysis ({detectionData.windows.length} Segments)</span>
-                <span className="text-[10px] text-[#555]">2.0s SLIDING WINDOWS</span>
+                <span className="text-[9px] sm:text-[10px] text-[#555]">2.0s SLIDING WINDOWS</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                 {detectionData.windows.map((w, idx) => (
                   <div 
                     key={idx}
-                    className={`p-2.5 border text-center font-mono text-[10px] ${
+                    className={`p-2 sm:p-2.5 border text-center font-mono text-[9px] sm:text-[10px] ${
                       w.is_fake 
                         ? 'border-[#FF3333]/50 bg-[#FF3333]/10 text-[#FF3333]' 
                         : 'border-[#333] bg-[#0a0a0a] text-[#888]'
@@ -1214,7 +1244,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                   >
                     <div className="font-bold">{w.start_time}s - {w.end_time}s</div>
                     <div className="mt-1 text-xs">{w.fake_percentage}%</div>
-                    <div className="text-[9px] uppercase tracking-wider mt-0.5">
+                    <div className="text-[8px] sm:text-[9px] uppercase tracking-wider mt-0.5">
                       {w.is_fake ? 'FAKE' : 'REAL'}
                     </div>
                   </div>
@@ -1225,10 +1255,10 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
         </div>
 
         {/* Right Column: Threat Probability & Protocol Enforcement */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-4 sm:gap-6">
           
-          <div className="tech-panel bg-black flex-1 p-6 flex flex-col justify-between border border-[#1f1f1f]">
-            <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-4 mb-6 flex justify-between items-center">
+          <div className="tech-panel bg-black flex-1 p-4 sm:p-6 flex flex-col justify-between border border-[#1f1f1f]">
+            <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-3 sm:pb-4 mb-4 sm:mb-6 flex justify-between items-center">
               <span>Threat Probability</span>
               {detectionData && (
                 <span className={`text-[10px] px-2 py-0.5 font-bold ${isFakeVerdict ? 'bg-[#FF3333] text-black' : 'bg-[#CCFF00] text-black'}`}>
@@ -1237,14 +1267,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               )}
             </div>
             
-            <div className="text-center my-4">
-              <span className={`text-7xl font-bold tracking-tighter ${
+            <div className="text-center my-2 sm:my-4">
+              <span className={`text-5xl xs:text-6xl sm:text-7xl font-bold tracking-tighter ${
                 isFakeVerdict ? 'text-[#FF3333]' : (status === 'safe' ? 'text-[#CCFF00]' : 'text-white')
               }`}>
-                {Math.round(currentRiskScore)}<span className="text-4xl text-[#555]">%</span>
+                {Math.round(currentRiskScore)}<span className="text-3xl sm:text-4xl text-[#555]">%</span>
               </span>
               
-              <div className="mt-4 font-mono text-xs tracking-widest uppercase text-[#aaa]">
+              <div className="mt-3 sm:mt-4 font-mono text-[11px] sm:text-xs tracking-wider sm:tracking-widest uppercase text-[#aaa] break-words">
                 {detectionData ? (
                   isFakeVerdict 
                     ? `AI DEEPFAKE PROBABILITY: ${detectionData.fake_probability_pct}%` 
@@ -1253,13 +1283,13 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               </div>
 
               {detectionData && (
-                <div className="mt-2 font-mono text-[10px] text-[#666]">
+                <div className="mt-1.5 sm:mt-2 font-mono text-[9px] sm:text-[10px] text-[#666]">
                   Calibrated Threshold: {detectionData.threshold} | Windows: {detectionData.audio_metrics?.windows_analyzed}
                 </div>
               )}
             </div>
 
-            <div className="mt-8">
+            <div className="mt-6 sm:mt-8">
                <div className="w-full bg-[#111] h-3 relative">
                  {/* 5.09% threshold mark */}
                  <div 
@@ -1272,7 +1302,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                    style={{ width: `${Math.min(100, Math.max(0, currentRiskScore))}%` }}
                  />
                </div>
-               <div className="flex justify-between font-mono text-[9px] text-[#666] mt-1">
+               <div className="flex justify-between font-mono text-[8px] sm:text-[9px] text-[#666] mt-1">
                  <span>0% REAL</span>
                  <span className="text-white">| THRESHOLD 5.09%</span>
                  <span>100% AI</span>
@@ -1281,23 +1311,23 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           </div>
 
           {/* Action Module */}
-          <div className="tech-panel bg-black p-6 border border-[#1f1f1f]">
-            <div className="font-mono text-xs tracking-widest uppercase text-[#888888] mb-4">
+          <div className="tech-panel bg-black p-4 sm:p-6 border border-[#1f1f1f]">
+            <div className="font-mono text-xs tracking-widest uppercase text-[#888888] mb-3 sm:mb-4">
               Protocol Enforcement & Export
             </div>
             {detectionData ? (
-              <div className="space-y-3 animate-in slide-in-from-bottom-2">
+              <div className="space-y-2.5 sm:space-y-3 animate-in slide-in-from-bottom-2">
                 {isFakeVerdict ? (
                   <button 
                     onClick={() => alert(`Connection Blocked: Synthetic identity impersonation detected on file ${fileName}`)}
-                    className="w-full py-3 bg-[#FF3333] text-black font-mono font-bold text-xs uppercase tracking-widest hover:bg-white transition-colors"
+                    className="w-full py-2.5 sm:py-3 bg-[#FF3333] text-black font-mono font-bold text-[11px] sm:text-xs uppercase tracking-wider sm:tracking-widest hover:bg-white transition-colors"
                   >
                     🚨 Block Audio Stream
                   </button>
                 ) : (
                   <button 
                     onClick={() => alert(`Connection Approved: Verified human voice authentication for ${fileName}`)}
-                    className="w-full py-3 bg-[#CCFF00] text-black font-mono font-bold text-xs uppercase tracking-widest hover:bg-white transition-colors"
+                    className="w-full py-2.5 sm:py-3 bg-[#CCFF00] text-black font-mono font-bold text-[11px] sm:text-xs uppercase tracking-wider sm:tracking-widest hover:bg-white transition-colors"
                   >
                     ✅ Authorize Stream
                   </button>
@@ -1305,14 +1335,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                 
                 <button 
                   onClick={downloadAuditReport}
-                  className="w-full py-3 bg-transparent border border-[#333] text-white font-mono font-bold text-xs uppercase tracking-widest hover:border-white transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 sm:py-3 bg-transparent border border-[#333] text-white font-mono font-bold text-[11px] sm:text-xs uppercase tracking-wider sm:tracking-widest hover:border-white transition-colors flex items-center justify-center gap-2"
                 >
                   <Download className="w-3.5 h-3.5" /> Download Audit JSON
                 </button>
               </div>
             ) : (
-              <div className="h-[98px] flex items-center justify-center border border-[#1f1f1f] border-dashed">
-                <span className="font-mono text-[10px] text-[#555] uppercase">Waiting for audio analysis...</span>
+              <div className="h-[80px] sm:h-[98px] flex items-center justify-center border border-[#1f1f1f] border-dashed">
+                <span className="font-mono text-[9px] sm:text-[10px] text-[#555] uppercase">Waiting for audio analysis...</span>
               </div>
             )}
           </div>
@@ -1325,9 +1355,9 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
 
 function DataModule({ title, value, isAlert }) {
   return (
-    <div className={`tech-panel bg-black p-4 sm:p-5 border-l-2 ${isAlert ? 'border-l-[#FF3333]' : 'border-l-[#333]'}`}>
-      <h4 className="font-mono text-[10px] text-[#888888] uppercase tracking-widest mb-1">{title}</h4>
-      <div className={`font-mono text-base sm:text-lg font-bold truncate ${isAlert ? 'text-[#FF3333]' : 'text-[#f5f5f5]'}`}>
+    <div className={`tech-panel bg-black p-3 sm:p-5 border-l-2 ${isAlert ? 'border-l-[#FF3333]' : 'border-l-[#333]'}`}>
+      <h4 className="font-mono text-[9px] sm:text-[10px] text-[#888888] uppercase tracking-wider sm:tracking-widest mb-1 truncate">{title}</h4>
+      <div className={`font-mono text-sm sm:text-lg font-bold truncate ${isAlert ? 'text-[#FF3333]' : 'text-[#f5f5f5]'}`}>
         {value}
       </div>
     </div>
@@ -1339,52 +1369,52 @@ function DataModule({ title, value, isAlert }) {
    ========================================= */
 function TechnologyPage() {
   return (
-    <div className="animate-in fade-in duration-700 bg-black p-8 border border-[#1f1f1f]">
-      <div className="mb-16 border-b border-[#1f1f1f] pb-8">
-        <h2 className="text-4xl font-bold uppercase tracking-tighter mb-4 text-white">Architecture</h2>
-        <p className="font-mono text-[#888888] text-sm uppercase tracking-widest">
+    <div className="animate-in fade-in duration-700 bg-black p-4 sm:p-8 border border-[#1f1f1f]">
+      <div className="mb-8 sm:mb-16 border-b border-[#1f1f1f] pb-6 sm:pb-8">
+        <h2 className="text-3xl sm:text-4xl font-bold uppercase tracking-tighter mb-3 sm:mb-4 text-white">Architecture</h2>
+        <p className="font-mono text-[#888888] text-xs sm:text-sm uppercase tracking-widest">
           PyTorch Multi-Domain Deepfake Verification Pipeline
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-12">
-        <div className="space-y-12">
+      <div className="grid md:grid-cols-2 gap-8 md:gap-12">
+        <div className="space-y-8 sm:space-y-12">
           
-          <div className="relative pl-8 border-l border-[#333]">
+          <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
              <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
-             <h3 className="font-mono text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 01</h3>
-             <h4 className="text-2xl font-bold uppercase tracking-tight mb-3 text-white">Multi-STFT Spectrogram Transform</h4>
-             <p className="text-[#888888] text-sm leading-relaxed">
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 01</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">Multi-STFT Spectrogram Transform</h4>
+             <p className="text-[#888888] text-xs sm:text-sm leading-relaxed">
                Raw audio is normalized and transformed into a 3-channel feature map using STFT windows of 512, 1024, and 2048 samples with 128 mel bins. This captures both fine temporal transients and long-range frequency harmonics.
              </p>
           </div>
 
-          <div className="relative pl-8 border-l border-[#333]">
+          <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
              <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
-             <h3 className="font-mono text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 02</h3>
-             <h4 className="text-2xl font-bold uppercase tracking-tight mb-3 text-white">Squeeze-and-Excitation Residual CNN</h4>
-             <p className="text-[#888888] text-sm leading-relaxed">
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 02</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">Squeeze-and-Excitation Residual CNN</h4>
+             <p className="text-[#888888] text-xs sm:text-sm leading-relaxed">
                4-stage convolutional backbone with SE-blocks (Squeeze-and-Excitation) that dynamically recalibrates channel-wise feature responses, picking up subtle checkerboard artifacts and phase irregularities left by neural vocoders (HiFi-GAN, MelGAN).
              </p>
           </div>
 
-          <div className="relative pl-8 border-l border-[#333]">
+          <div className="relative pl-6 sm:pl-8 border-l border-[#333]">
              <div className="absolute left-[-5px] top-0 w-2 h-2 bg-[#CCFF00]" />
-             <h3 className="font-mono text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 03</h3>
-             <h4 className="text-2xl font-bold uppercase tracking-tight mb-3 text-white">Triple Statistical Pooling Classifier</h4>
-             <p className="text-[#888888] text-sm leading-relaxed">
+             <h3 className="font-mono text-xs sm:text-sm tracking-widest uppercase text-[#CCFF00] mb-2">Stage 03</h3>
+             <h4 className="text-xl sm:text-2xl font-bold uppercase tracking-tight mb-2 sm:mb-3 text-white">Triple Statistical Pooling Classifier</h4>
+             <p className="text-[#888888] text-xs sm:text-sm leading-relaxed">
                Feature maps are aggregated across mean, standard deviation, and max pooling (256 * 3 = 768 dimensions), fed through dense layers with SiLU activations and Dropout, outputting a calibrated sigmoid confidence score.
              </p>
           </div>
 
         </div>
 
-        <div className="tech-panel bg-black p-6 flex flex-col justify-between border border-[#1f1f1f]">
-          <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-4 mb-6">
+        <div className="tech-panel bg-black p-4 sm:p-6 flex flex-col justify-between border border-[#1f1f1f]">
+          <div className="font-mono text-xs tracking-widest uppercase text-[#888888] border-b border-[#1f1f1f] pb-3 sm:pb-4 mb-4 sm:mb-6">
             Inference API Specification
           </div>
           
-          <div className="font-mono text-xs leading-loose text-[#aaa]">
+          <div className="font-mono text-[10px] sm:text-xs leading-relaxed sm:leading-loose text-[#aaa] overflow-x-auto">
             <span className="text-[#CCFF00]">POST</span> /api/detect<br/>
             Content-Type: multipart/form-data<br/>
             Body: file=[audio_file_binary]<br/>

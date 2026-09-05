@@ -31,10 +31,10 @@
   
   /* Sharp, high-contrast buttons */
   .btn-primary {
-    @apply bg-[#CCFF00] text-black font-semibold font-mono tracking-widest text-xs uppercase px-8 py-4 hover:bg-white transition-colors duration-150;
+    @apply bg-[#CCFF00] text-black font-semibold font-mono tracking-widest text-xs uppercase px-5 py-3 sm:px-8 sm:py-4 hover:bg-white transition-colors duration-150;
   }
   
   .btn-outline {
-    @apply bg-black border border-[#333] text-white font-semibold font-mono tracking-widest text-xs uppercase px-8 py-4 hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors duration-150;
+    @apply bg-black border border-[#333] text-white font-semibold font-mono tracking-widest text-xs uppercase px-5 py-3 sm:px-8 sm:py-4 hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors duration-150;
   }
 }
