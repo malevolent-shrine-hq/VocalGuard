@@ -1,0 +1,8 @@
+# Ignore backend & Python files on Vercel frontend build
+api/
+model/
+requirements.txt
+Dockerfile
+.python-version
+venv/
+.venv/
