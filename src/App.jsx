@@ -1856,7 +1856,7 @@ function AboutPage({ setActiveView }) {
       skills: ["PyTorch", "Deep Learning", "FastAPI Backend", "Audio Processing", "Model Optimization"]
     },
     {
-      name: "Bijan Murma",
+      name: "Bijan Murmu",
       github: "https://github.com/bijanmurmu",
       handle: "@bijanmurmu",
       avatar: "https://avatars.githubusercontent.com/u/73417763?v=4",
@@ -2006,7 +2006,7 @@ function AboutPage({ setActiveView }) {
       <div className="bg-black p-6 sm:p-8 border border-[#1f1f1f] space-y-6">
         <div className="flex items-center gap-2 font-mono text-xs text-[#CCFF00] tracking-widest uppercase">
           <Shield className="w-4 h-4 text-[#CCFF00]" />
-          <span>HACKATHON CONTEXT // SMART INDIA HACKATHON 2024</span>
+          <span>HACKATHON CONTEXT // SMART INDIA HACKATHON 2026</span>
         </div>
 
         <h3 className="text-2xl sm:text-3xl font-bold uppercase tracking-tight text-white">
@@ -2287,12 +2287,12 @@ function Footer({ activeView, setActiveView, backendStatus }) {
                 <div className="flex items-center gap-2.5 min-w-0">
                   <img 
                     src="https://avatars.githubusercontent.com/u/73417763?v=4" 
-                    alt="Bijan Murma" 
+                    alt="Bijan Murmu" 
                     className="w-6 h-6 rounded-none border border-[#333] shrink-0" 
                   />
                   <div className="truncate">
                     <div className="text-xs text-white group-hover:text-[#CCFF00] transition-colors font-mono font-medium truncate">
-                      Bijan Murma
+                      Bijan Murmu
                     </div>
                     <div className="text-[10px] text-[#666] font-mono truncate">
                       Frontend & UI/UX Systems
@@ -2310,7 +2310,7 @@ function Footer({ activeView, setActiveView, backendStatus }) {
               Source Code
             </div>
             <p className="text-[11px] text-[#666] font-mono leading-relaxed">
-              Open-source neural defense implementation for SIH 2024 (Problem Statement 26104).
+              Open-source neural defense implementation for SIH 2026 (Problem Statement 26104).
             </p>
             <a 
               href="https://github.com/malevolent-shrine-hq/VocalGuard" 
@@ -2337,7 +2337,7 @@ function Footer({ activeView, setActiveView, backendStatus }) {
           <div className="flex flex-wrap items-center gap-2 text-center sm:text-left">
             <span>© 2026 VOCALGUARD FORENSICS</span>
             <span className="hidden sm:inline text-[#333]">|</span>
-            <span>BUILT BY BIMBOK MUKHERJEE, ADITYA PAUL & BIJAN MURMA</span>
+            <span>BUILT BY BIMBOK MUKHERJEE, ADITYA PAUL & BIJAN MURMU</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[#555]">ALL INDIA COUNCIL FOR TECHNICAL EDUCATION (AICTE)</span>

@@ -61,7 +61,7 @@ uvicorn index:app --reload --port 8000
 
 - **[Bimbok Mukherjee](https://github.com/Bimbok)** — PyTorch Model Architecture, DSP Pipeline & Backend Systems
 - **[Aditya Paul](https://github.com/adityapaul26)** — PyTorch Model Optimization, DSP Pipeline & Backend Systems
-- **[Bijan Murma](https://github.com/bijanmurmu)** — Frontend Web Application & Cyber-Industrial UI/UX Systems
+- **[Bijan Murmu](https://github.com/bijanmurmu)** — Frontend Web Application & Cyber-Industrial UI/UX Systems
 
 ---
 *Engineered for All India Council for Technical Education (Cyber Security Cell) - SIH Problem Statement 26104.*
