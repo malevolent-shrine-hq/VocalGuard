@@ -5,7 +5,7 @@ import {
   Upload, RefreshCw, Mic, CheckCircle2,
   Download, AlertOctagon, Radio,
   Terminal, FileAudio, ChevronDown, ChevronUp, Loader2,
-  ArrowUpRight, Shield, Code2
+  ArrowUpRight, Shield, Code2, Menu, X
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -129,18 +129,24 @@ function TopoBackground() {
    NAVIGATION BAR
    ========================================= */
 function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur border-b border-[#1f1f1f]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
         
         <div 
           className="flex items-center gap-2 sm:gap-4 cursor-pointer shrink-0"
-          onClick={() => setActiveView('dashboard')}
+          onClick={() => {
+            setActiveView('dashboard');
+            setMobileMenuOpen(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         >
           <div className="w-5 h-5 sm:w-6 sm:h-6 bg-[#CCFF00] flex items-center justify-center shrink-0">
             <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-black" />
           </div>
-          <span className="text-lg sm:text-xl font-bold tracking-tighter uppercase text-white">
+          <span className="text-base sm:text-xl font-bold tracking-tighter uppercase text-white font-mono">
             Vocal<span className="text-[#888888] font-light">Guard</span>
           </span>
           <span className="hidden lg:inline-block font-mono text-[9px] bg-[#111] text-[#888] border border-[#222] px-2 py-0.5">
@@ -148,8 +154,9 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
           </span>
         </div>
         
-        <div className="flex items-center gap-2 sm:gap-4 md:gap-8 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Desktop Status Badge & Ping Button */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px] sm:text-[10px] tracking-wider uppercase shrink-0 px-2 py-1 bg-[#0a0a0a] border border-[#222]">
               <span className={`w-2 h-2 rounded-full shrink-0 ${
                 backendStatus.online 
@@ -161,16 +168,9 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
                   ? 'text-[#888]' 
                   : (backendStatus.checking ? 'text-amber-400' : 'text-[#FF3333]')
               }>
-                <span className="hidden sm:inline">
-                  {backendStatus.online 
-                    ? (backendStatus.latencyMs ? `API ONLINE (${backendStatus.latencyMs}ms)` : 'API ONLINE')
-                    : (backendStatus.checking ? 'WAKING API...' : 'API ASLEEP')}
-                </span>
-                <span className="sm:hidden">
-                  {backendStatus.online 
-                    ? 'ONLINE' 
-                    : (backendStatus.checking ? 'WAKING...' : 'OFFLINE')}
-                </span>
+                {backendStatus.online 
+                  ? (backendStatus.latencyMs ? `API ONLINE (${backendStatus.latencyMs}ms)` : 'API ONLINE')
+                  : (backendStatus.checking ? 'WAKING API...' : 'API ASLEEP')}
               </span>
             </div>
 
@@ -181,42 +181,147 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
               title="Ping backend / wake up Render instance (free tier spins down after 15m inactivity)"
             >
               <RefreshCw className={`w-3 h-3 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#777] group-hover:text-[#CCFF00]'}`} />
-              <span className="hidden xs:inline font-semibold">
+              <span className="font-semibold">
                 {backendStatus.checking ? 'Pinging...' : 'Ping Server'}
               </span>
             </button>
           </div>
 
-          {/* Mobile compact nav buttons */}
-          <div className="md:hidden flex items-center gap-1 shrink-0">
-            <button 
-              onClick={() => { setActiveView('technology'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className={`font-mono text-[9px] px-1.5 py-0.5 uppercase ${activeView === 'technology' ? 'text-[#CCFF00] border-b border-[#CCFF00]' : 'text-[#888]'}`}
-            >
-              Arch
-            </button>
-            <button 
-              onClick={() => { setActiveView('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className={`font-mono text-[9px] px-1.5 py-0.5 uppercase ${activeView === 'about' ? 'text-[#CCFF00] border-b border-[#CCFF00]' : 'text-[#888]'}`}
-            >
-              About
-            </button>
-            <button 
-              onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className={`font-mono text-[9px] px-2 py-0.5 uppercase font-bold ${activeView === 'dashboard' ? 'bg-[#CCFF00] text-black' : 'text-[#888] border border-[#333]'}`}
-            >
-              Console
-            </button>
-          </div>
-
-          <div className="hidden md:flex items-center gap-6">
+          {/* Desktop Navigation Links */}
+          <div className="hidden md:flex items-center gap-6 ml-2">
             <NavLink label="Platform" active={activeView === 'landing'} onClick={() => { setActiveView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
             <NavLink label="Architecture" active={activeView === 'technology'} onClick={() => { setActiveView('technology'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
             <NavLink label="About" active={activeView === 'about'} onClick={() => { setActiveView('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
             <NavLink label="Console" active={activeView === 'dashboard'} onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} isAccent />
           </div>
+
+          {/* Mobile Quick Status Pill */}
+          <button
+            onClick={onRetryBackend}
+            disabled={backendStatus.checking}
+            className="md:hidden flex items-center gap-1.5 text-[9px] font-mono border border-[#222] bg-[#0c0c0c] hover:border-[#CCFF00] px-2 py-1 text-[#aaa] transition-colors shrink-0"
+            title="Ping backend gateway"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              backendStatus.online 
+                ? 'bg-[#CCFF00]' 
+                : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
+            }`} />
+            <span className="uppercase">{backendStatus.online ? (backendStatus.latencyMs ? `${backendStatus.latencyMs}ms` : 'ONLINE') : (backendStatus.checking ? 'WAKING' : 'OFFLINE')}</span>
+            <RefreshCw className={`w-2.5 h-2.5 shrink-0 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#666]'}`} />
+          </button>
+
+          {/* Mobile Hamburger Toggle Button */}
+          <button
+            onClick={() => setMobileMenuOpen(prev => !prev)}
+            className="md:hidden p-1.5 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] hover:border-[#CCFF00] text-white transition-colors focus:outline-none shrink-0"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? (
+              <X className="w-5 h-5 text-[#CCFF00]" />
+            ) : (
+              <Menu className="w-5 h-5 text-white" />
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Dropdown Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-black/98 border-b border-[#222] px-4 py-4 space-y-2 animate-in slide-in-from-top-2 duration-200 shadow-2xl backdrop-blur-md">
+          <div className="text-[9px] font-mono text-[#666] uppercase tracking-widest border-b border-[#181818] pb-1.5 mb-2 flex justify-between items-center">
+            <span>Navigation Menu</span>
+            <span className="text-[#CCFF00]">VOCALGUARD v3.0</span>
+          </div>
+
+          <button
+            onClick={() => {
+              setActiveView('landing');
+              setMobileMenuOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`w-full flex items-center justify-between p-2.5 font-mono text-xs uppercase tracking-wider text-left border transition-all ${
+              activeView === 'landing'
+                ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
+                : 'bg-[#0a0a0a] border-[#1e1e1e] text-[#aaa] hover:text-white'
+            }`}
+          >
+            <div>
+              <div className="font-bold">// 01 PLATFORM</div>
+              <div className="text-[10px] text-[#666] normal-case">Forensic deepfake detection overview</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[#555]" />
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveView('technology');
+              setMobileMenuOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`w-full flex items-center justify-between p-2.5 font-mono text-xs uppercase tracking-wider text-left border transition-all ${
+              activeView === 'technology'
+                ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
+                : 'bg-[#0a0a0a] border-[#1e1e1e] text-[#aaa] hover:text-white'
+            }`}
+          >
+            <div>
+              <div className="font-bold">// 02 ARCHITECTURE</div>
+              <div className="text-[10px] text-[#666] normal-case">Multi-Res STFT & Anisotropic SE-ResNet v3</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[#555]" />
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveView('about');
+              setMobileMenuOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`w-full flex items-center justify-between p-2.5 font-mono text-xs uppercase tracking-wider text-left border transition-all ${
+              activeView === 'about'
+                ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
+                : 'bg-[#0a0a0a] border-[#1e1e1e] text-[#aaa] hover:text-white'
+            }`}
+          >
+            <div>
+              <div className="font-bold">// 03 ABOUT TEAM</div>
+              <div className="text-[10px] text-[#666] normal-case">Bimbok, Aditya & Bijan (SIH PS 26104)</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[#555]" />
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveView('dashboard');
+              setMobileMenuOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="w-full flex items-center justify-between p-3 font-mono text-xs uppercase tracking-wider text-left bg-[#CCFF00] text-black font-bold border border-[#CCFF00] hover:bg-white transition-all shadow-[0_0_12px_rgba(204,255,0,0.25)] mt-1"
+          >
+            <div>
+              <div>// 04 OPERATIONS CONSOLE</div>
+              <div className="text-[10px] text-black/80 font-normal normal-case">Launch live deepfake analysis engine</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-black" />
+          </button>
+
+          <div className="pt-2 border-t border-[#181818] flex items-center justify-between text-[10px] font-mono text-[#777] mt-3">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${backendStatus.online ? 'bg-[#CCFF00] animate-pulse' : 'bg-red-500'}`} />
+              <span>{backendStatus.online ? `API ONLINE (${backendStatus.latencyMs || 35}ms)` : 'API ASLEEP'}</span>
+            </div>
+            <button
+              onClick={() => onRetryBackend()}
+              disabled={backendStatus.checking}
+              className="text-[#CCFF00] hover:underline uppercase flex items-center gap-1 border border-[#333] px-2 py-0.5 bg-[#111]"
+            >
+              <RefreshCw className={`w-2.5 h-2.5 ${backendStatus.checking ? 'animate-spin' : ''}`} />
+              <span>{backendStatus.checking ? 'Pinging...' : 'Ping Server'}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
