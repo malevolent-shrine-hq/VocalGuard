@@ -182,7 +182,7 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
             >
               <RefreshCw className={`w-3 h-3 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#777] group-hover:text-[#CCFF00]'}`} />
               <span className="hidden xs:inline font-semibold">
-                {backendStatus.checking ? 'Pinging...' : 'Wake Server'}
+                {backendStatus.checking ? 'Pinging...' : 'Ping Server'}
               </span>
             </button>
           </div>
@@ -1007,8 +1007,8 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
             <RefreshCw className={`w-3.5 h-3.5 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#888] group-hover:text-[#CCFF00]'}`} />
             <span>
               {backendStatus.checking 
-                ? 'Waking Server...' 
-                : (backendStatus.online ? 'Ping / Refresh Server' : 'Wake Up Backend')}
+                ? 'Pinging Server...' 
+                : (backendStatus.online ? 'Ping Server' : 'Wake Server')}
             </span>
             {backendStatus.online && backendStatus.latencyMs && (
               <span className="text-[9px] text-[#CCFF00] font-bold px-1 bg-[#CCFF00]/10 border border-[#CCFF00]/30">
