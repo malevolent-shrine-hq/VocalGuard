@@ -385,29 +385,95 @@ class DetectorManager:
 
         threshold = custom_threshold if custom_threshold is not None else self.threshold
         window_results = []
-        fake_probs = []
+        fake_probs: List[float] = []
+        rms_energies: List[float] = []
 
+        # 1. Primary window evaluation (exactly matching infer.py 0-2s evaluation)
+        primary_chunk = audio[:NUM_SAMPLES] if len(audio) >= NUM_SAMPLES else np.pad(audio, (0, NUM_SAMPLES - len(audio)))
+        primary_tensor = torch.from_numpy(primary_chunk).float().unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            prim_feat = self.mel_transform(primary_tensor)
+            primary_fake_prob = float(torch.sigmoid(self.model(prim_feat)).item())
+
+        # 2. Multi-window evaluation across the audio stream
         with torch.no_grad():
             for start_s, end_s, win_tensor in windows:
                 win_tensor = win_tensor.to(self.device)
                 feat = self.mel_transform(win_tensor)
                 logits = self.model(feat)
-                prob = torch.sigmoid(logits).item()
+                prob = float(torch.sigmoid(logits).item())
+                
+                win_audio_np = win_tensor.squeeze(0).cpu().numpy()
+                win_rms = float(np.sqrt(np.mean(win_audio_np ** 2)))
+                rms_energies.append(win_rms)
                 fake_probs.append(prob)
+
                 window_results.append({
                     "start_time": start_s,
                     "end_time": end_s,
                     "fake_probability": round(prob, 4),
                     "fake_percentage": round(prob * 100, 2),
+                    "rms_energy": round(win_rms, 5),
                     "is_fake": bool(prob >= threshold)
                 })
 
-        max_fake_prob = float(np.max(fake_probs))
-        mean_fake_prob = float(np.mean(fake_probs))
+        max_fake_prob = float(np.max(fake_probs)) if fake_probs else 0.0
+        mean_fake_prob = float(np.mean(fake_probs)) if fake_probs else 0.0
         
-        # Primary threat probability uses max if significant synthetic segments exist
-        threat_prob = max_fake_prob if max_fake_prob >= threshold else mean_fake_prob
-        is_fake = bool(threat_prob >= threshold)
+        # 3. Voice Activity / Energy Gating
+        # Silent/low-energy windows trigger false synthetic vocoder artifacts in CNNs
+        peak_win_rms = max(rms_energies) if rms_energies else 1.0
+        voiced_indices = [
+            i for i, r in enumerate(rms_energies) 
+            if r >= 0.008 and r >= 0.04 * peak_win_rms
+        ]
+        if not voiced_indices:
+            voiced_indices = list(range(len(fake_probs)))
+            
+        voiced_probs = [fake_probs[i] for i in voiced_indices]
+        v_median = float(np.median(voiced_probs)) if voiced_probs else mean_fake_prob
+        v_mean = float(np.mean(voiced_probs)) if voiced_probs else mean_fake_prob
+        fake_win_ratio = float(np.mean([p >= threshold for p in voiced_probs])) if voiced_probs else 0.0
+
+        # Check for sustained consecutive synthetic segments (localized deepfake detection)
+        consec_high = 0
+        max_consec_high = 0
+        for p in voiced_probs:
+            if p >= 0.50:
+                consec_high += 1
+                max_consec_high = max(max_consec_high, consec_high)
+            else:
+                consec_high = 0
+
+        # 4. Scientifically robust multi-window aggregation & decision logic
+        if len(windows) <= 2:
+            # Short sample (<= 2s - 3s): use primary window directly (exact infer.py equivalence)
+            threat_prob = primary_fake_prob
+            is_fake = bool(threat_prob >= threshold)
+            decision_rationale = "single_window_evaluation"
+        else:
+            # Long sample / full stream: require sustained or consensus synthetic cues
+            if max_consec_high >= 4:
+                # Sustained synthetic speech detected in a continuous segment
+                is_fake = True
+                threat_prob = float(np.percentile(voiced_probs, 90))
+                decision_rationale = "sustained_synthetic_segment"
+            elif fake_win_ratio >= 0.65 and v_median >= threshold:
+                # Majority of voiced windows consistently show synthetic vocoder markers
+                is_fake = True
+                threat_prob = v_median
+                decision_rationale = "majority_synthetic_consensus"
+            elif primary_fake_prob >= threshold and (v_median >= threshold or fake_win_ratio >= 0.50):
+                # Both initial segment and majority temporal windows indicate synthetic voice
+                is_fake = True
+                threat_prob = max(primary_fake_prob, v_median)
+                decision_rationale = "primary_and_consensus_fake"
+            else:
+                # Natural human speech or song (isolated spikes are studio/reverb/music anomalies)
+                is_fake = False
+                threat_prob = min(primary_fake_prob, v_median) if primary_fake_prob < threshold else v_median
+                decision_rationale = "authentic_human_consensus"
+
         real_prob = float(np.clip(1.0 - threat_prob, 0.0, 1.0))
 
         # Risk and Alert classification
@@ -439,6 +505,11 @@ class DetectorManager:
             "real_probability_pct": round(real_prob * 100, 2),
             "max_window_fake_prob": round(max_fake_prob, 4),
             "mean_window_fake_prob": round(mean_fake_prob, 4),
+            "median_window_fake_prob": round(v_median, 4),
+            "fake_window_ratio": round(fake_win_ratio, 4),
+            "primary_window_fake_prob": round(primary_fake_prob, 4),
+            "primary_window_verdict": "FAKE" if primary_fake_prob >= threshold else "REAL",
+            "decision_rationale": decision_rationale,
             "threshold": round(threshold, 4),
             "alert_level": alert_level,
             "latency_ms": latency_ms,
@@ -448,6 +519,7 @@ class DetectorManager:
                 "processed_sample_rate": SAMPLE_RATE,
                 "total_samples": num_audio_samples,
                 "windows_analyzed": len(windows),
+                "voiced_windows_analyzed": len(voiced_indices),
                 "peak_amplitude": round(peak_amp, 4),
                 "rms_energy": round(rms_energy, 4),
                 "spectral_centroid_hz": round(spectral_centroid, 1),
