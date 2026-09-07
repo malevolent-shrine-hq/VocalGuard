@@ -631,14 +631,6 @@ function PipelineStepper({ activeStage, uploadProgress, uploadPhase }) {
 }
 
 function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onAbort, isCollapsed, setIsCollapsed }) {
-  const terminalBottomRef = useRef(null);
-
-  useEffect(() => {
-    if (terminalBottomRef.current) {
-      terminalBottomRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
-
   return (
     <div className="tech-panel bg-black border border-[#1f1f1f] w-full overflow-hidden">
       {/* Terminal Header */}
@@ -708,7 +700,6 @@ function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onA
               <span className="text-[9px] sm:text-[10px]">PROCESSING PIPELINE...</span>
             </div>
           )}
-          <div ref={terminalBottomRef} />
         </div>
       )}
     </div>
