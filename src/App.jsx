@@ -9,6 +9,29 @@ import {
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const MAX_LIVE_HISTORY = 120;
+
+function getLiveWebSocketUrl() {
+  const configured = import.meta.env.VITE_WS_BASE_URL;
+  if (configured) return `${configured.replace(/\/$/, '')}/ws/detect`;
+  if (API_BASE) return `${API_BASE.replace(/^http/, 'ws')}/ws/detect`;
+  return `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/detect`;
+}
+
+function resampleTo16k(samples, sourceRate) {
+  if (sourceRate === 16000) return samples;
+  const outputLength = Math.max(1, Math.round(samples.length * 16000 / sourceRate));
+  const output = new Float32Array(outputLength);
+  const ratio = sourceRate / 16000;
+  for (let i = 0; i < outputLength; i += 1) {
+    const position = i * ratio;
+    const left = Math.floor(position);
+    const right = Math.min(left + 1, samples.length - 1);
+    const fraction = position - left;
+    output[i] = samples[left] + (samples[right] - samples[left]) * fraction;
+  }
+  return output;
+}
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -703,6 +726,11 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [isLiveDetecting, setIsLiveDetecting] = useState(false);
+  const [livePhase, setLivePhase] = useState('IDLE');
+  const [liveData, setLiveData] = useState(null);
+  const [liveHistory, setLiveHistory] = useState([]);
+  const [liveSeconds, setLiveSeconds] = useState(0);
   const [detectionData, setDetectionData] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -723,6 +751,15 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
   const stageTimer1Ref = useRef(null);
   const stageTimer2Ref = useRef(null);
   const logCounterRef = useRef(0);
+  const liveSocketRef = useRef(null);
+  const liveStreamRef = useRef(null);
+  const liveContextRef = useRef(null);
+  const liveSourceRef = useRef(null);
+  const liveProcessorRef = useRef(null);
+  const liveMuteRef = useRef(null);
+  const liveAnalyserRef = useRef(null);
+  const liveTimerRef = useRef(null);
+  const liveStoppingRef = useRef(false);
 
   const addLog = useCallback((tag, msg, type = 'info') => {
     const now = new Date();
@@ -731,6 +768,128 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
     const newEntry = { id: logCounterRef.current, time: timeStr, tag, msg, type };
     setTerminalLogs(prev => [...prev.slice(-49), newEntry]);
   }, []);
+
+  const releaseLiveResources = useCallback(() => {
+    if (liveTimerRef.current) clearInterval(liveTimerRef.current);
+    liveTimerRef.current = null;
+    if (liveProcessorRef.current) {
+      liveProcessorRef.current.onaudioprocess = null;
+      liveProcessorRef.current.disconnect();
+    }
+    liveSourceRef.current?.disconnect();
+    liveMuteRef.current?.disconnect();
+    liveStreamRef.current?.getTracks().forEach(track => track.stop());
+    if (liveContextRef.current && liveContextRef.current.state !== 'closed') liveContextRef.current.close();
+    liveProcessorRef.current = null;
+    liveSourceRef.current = null;
+    liveMuteRef.current = null;
+    liveAnalyserRef.current = null;
+    liveStreamRef.current = null;
+    liveContextRef.current = null;
+  }, []);
+
+  const stopLiveDetection = useCallback((reason) => {
+    liveStoppingRef.current = true;
+    const socket = liveSocketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'stop' }));
+    if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'Operator stopped live detection');
+    liveSocketRef.current = null;
+    releaseLiveResources();
+    setIsLiveDetecting(false);
+    setLivePhase('IDLE');
+    if (reason) {
+      setErrorMessage(reason);
+      addLog('LIVE', reason, 'warning');
+    }
+  }, [addLog, releaseLiveResources]);
+
+  const startLiveDetection = useCallback(async () => {
+    if (isLiveDetecting || isRecording || isAnalyzing) return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.WebSocket || !window.AudioContext) {
+      setErrorMessage('Live detection requires microphone, WebSocket, and Web Audio API support.');
+      setLivePhase('ERROR');
+      return;
+    }
+    liveStoppingRef.current = false;
+    setErrorMessage(null);
+    setLiveData(null);
+    setLiveHistory([]);
+    setLiveSeconds(0);
+    setLivePhase('CONNECTING');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (liveStoppingRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
+      const context = new AudioContext();
+      await context.resume();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      const mute = context.createGain();
+      mute.gain.value = 0;
+      liveStreamRef.current = stream;
+      liveContextRef.current = context;
+      liveSourceRef.current = source;
+      liveAnalyserRef.current = analyser;
+      liveProcessorRef.current = processor;
+      liveMuteRef.current = mute;
+
+      const socket = new WebSocket(getLiveWebSocketUrl());
+      socket.binaryType = 'arraybuffer';
+      liveSocketRef.current = socket;
+      socket.onopen = () => {
+        if (liveStoppingRef.current) return;
+        socket.send(JSON.stringify({ type: 'start', format: 'pcm_s16le', sample_rate: 16000, channels: 1 }));
+        source.connect(analyser);
+        analyser.connect(processor);
+        processor.connect(mute);
+        mute.connect(context.destination);
+        processor.onaudioprocess = (event) => {
+          const input = event.inputBuffer.getChannelData(0);
+          event.outputBuffer.getChannelData(0).fill(0);
+          if (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount > 512 * 1024) return;
+          const pcm = resampleTo16k(input, context.sampleRate);
+          const encoded = new Int16Array(pcm.length);
+          for (let i = 0; i < pcm.length; i += 1) encoded[i] = Math.max(-1, Math.min(1, pcm[i])) * 32767;
+          socket.send(encoded.buffer);
+        };
+        setIsLiveDetecting(true);
+        setLivePhase('LISTENING');
+        liveTimerRef.current = setInterval(() => setLiveSeconds(seconds => seconds + 1), 1000);
+        addLog('LIVE', 'WebSocket open; streaming in-memory PCM 16 kHz mono.', 'success');
+      };
+      socket.onmessage = (event) => {
+        if (liveStoppingRef.current) return;
+        let frame;
+        try { frame = JSON.parse(event.data); } catch { return; }
+        if (frame.type === 'prediction') {
+          setLiveData(frame);
+          setLivePhase(frame.state || 'ANALYZING');
+          setLiveHistory(history => [...history.slice(-(MAX_LIVE_HISTORY - 1)), frame]);
+          addLog('LIVE', `Window ${frame.window_start}s–${frame.window_end}s: fake ${frame.fake_percentage}% (EMA ${frame.smoothed_percentage}%).`, frame.is_fake ? 'danger' : 'success');
+        } else if (frame.type === 'status') {
+          setLivePhase(frame.state || 'LISTENING');
+        } else if (frame.type === 'error') {
+          setErrorMessage(frame.message || 'Live analysis error.');
+          setLivePhase('ERROR');
+          addLog('LIVE', frame.message || 'Live analysis error.', 'danger');
+        }
+      };
+      socket.onerror = () => { setErrorMessage('Unable to connect to VocalGuard analysis server.'); setLivePhase('ERROR'); };
+      socket.onclose = () => {
+        if (!liveStoppingRef.current) {
+          releaseLiveResources();
+          setIsLiveDetecting(false);
+          setLivePhase('ERROR');
+          setErrorMessage('Live analysis stopped because the server disconnected.');
+        }
+      };
+    } catch (err) {
+      releaseLiveResources();
+      setLivePhase('ERROR');
+      setErrorMessage(err.name === 'NotAllowedError' ? 'Microphone permission denied.' : `Unable to start live detection: ${err.message}`);
+    }
+  }, [addLog, isAnalyzing, isLiveDetecting, isRecording, releaseLiveResources]);
 
   // Audio Playback Listener
   useEffect(() => {
@@ -750,8 +909,11 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
         xhrRef.current.abort();
         xhrRef.current = null;
       }
+      liveStoppingRef.current = true;
+      liveSocketRef.current?.close();
+      releaseLiveResources();
     };
-  }, []);
+  }, [releaseLiveResources]);
 
   // Revoke previous audio blob URL when a new one is set or on unmount
   useEffect(() => {
@@ -1154,27 +1316,74 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
         <div className="grid grid-cols-1 xs:grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={() => handleLoadSample('/samples/real_human_voice.m4a', 'real_human_voice.m4a')}
-            disabled={isAnalyzing || isRecording}
+            disabled={isAnalyzing || isRecording || isLiveDetecting}
             className="font-mono text-[10px] sm:text-[11px] tracking-wider uppercase px-2.5 sm:px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#CCFF00] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <CheckCircle2 className="w-3 h-3 text-[#CCFF00] shrink-0" /> Real Human
           </button>
           <button
             onClick={() => handleLoadSample('/samples/ai_synthetic_voicemaker.mp3', 'ai_synthetic_voicemaker.mp3')}
-            disabled={isAnalyzing || isRecording}
+            disabled={isAnalyzing || isRecording || isLiveDetecting}
             className="font-mono text-[10px] sm:text-[11px] tracking-wider uppercase px-2.5 sm:px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#FF3333] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <AlertTriangle className="w-3 h-3 text-[#FF3333] shrink-0" /> Voicemaker TTS
           </button>
           <button
             onClick={() => handleLoadSample('/samples/ai_generated_speech.mp3', 'ai_generated_speech.mp3')}
-            disabled={isAnalyzing || isRecording}
+            disabled={isAnalyzing || isRecording || isLiveDetecting}
             className="font-mono text-[10px] sm:text-[11px] tracking-wider uppercase px-2.5 sm:px-3 py-1.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#FF3333] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <AlertOctagon className="w-3 h-3 text-[#FF3333] shrink-0" /> Synthetic Speech
           </button>
         </div>
       </div>
+
+      <section className="mb-6 tech-panel bg-black border-[#2a2a2a] overflow-hidden">
+        <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#1f1f1f]">
+          <div>
+            <div className="flex items-center gap-2 font-mono text-xs tracking-widest uppercase text-[#CCFF00]">
+              <span className={`w-2 h-2 rounded-full ${isLiveDetecting ? 'bg-[#CCFF00] animate-pulse' : 'bg-[#555]'}`} />
+              Live voice monitor
+            </div>
+            <p className="font-mono text-[10px] text-[#777] mt-1">PCM 16 kHz mono → 2.0s rolling context → prediction every 1.0s. Audio remains in memory.</p>
+          </div>
+          <button
+            onClick={isLiveDetecting ? () => stopLiveDetection() : startLiveDetection}
+            disabled={isAnalyzing || isRecording || livePhase === 'CONNECTING'}
+            className={`font-mono text-xs uppercase tracking-widest font-bold px-5 py-3 transition-colors disabled:opacity-50 ${isLiveDetecting ? 'bg-[#FF3333] text-black hover:bg-white' : 'bg-[#CCFF00] text-black hover:bg-white'}`}
+          >
+            {livePhase === 'CONNECTING' ? 'Connecting…' : isLiveDetecting ? `Stop live detection (${liveSeconds}s)` : 'Start live detection'}
+          </button>
+        </div>
+        <div className="grid md:grid-cols-12 gap-0">
+          <div className="md:col-span-7 p-4 sm:p-5 border-b md:border-b-0 md:border-r border-[#1f1f1f]">
+            <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider mb-3">
+              <span className="text-[#888]">Microphone waveform</span>
+              <span className={livePhase === 'ERROR' ? 'text-[#FF3333]' : 'text-[#CCFF00]'}>{livePhase}</span>
+            </div>
+            <LiveWaveform analyserRef={liveAnalyserRef} active={isLiveDetecting} />
+            {livePhase === 'BUFFERING' && <div className="mt-2 font-mono text-[10px] text-[#888]">Collecting the first complete 2-second speech window…</div>}
+            {livePhase === 'NO_SPEECH' && <div className="mt-2 font-mono text-[10px] text-amber-300">No speech detected; the CNN is gated until voiced audio arrives.</div>}
+            {livePhase === 'ERROR' && <div className="mt-2 font-mono text-[10px] text-[#FF3333]">{errorMessage}</div>}
+          </div>
+          <div className="md:col-span-5 p-4 sm:p-5 grid grid-cols-2 gap-4 font-mono">
+            <div>
+              <div className="text-[9px] uppercase tracking-widest text-[#777]">Fake probability</div>
+              <div className={`text-3xl sm:text-4xl font-bold ${liveData?.is_fake ? 'text-[#FF3333]' : 'text-white'}`}>{liveData ? `${liveData.fake_percentage}%` : '—'}</div>
+              <div className="text-[9px] text-[#777] mt-1">EMA: {liveData ? `${liveData.smoothed_percentage}%` : '—'}</div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase tracking-widest text-[#777]">Detection state</div>
+              <div className={`text-lg font-bold mt-2 ${liveData?.risk_level === 'HIGH' ? 'text-[#FF3333]' : liveData ? 'text-[#CCFF00]' : 'text-[#aaa]'}`}>{liveData?.state || livePhase}</div>
+              <div className="text-[9px] text-[#777] mt-2">Risk: {liveData?.risk_level || '—'} · confidence: {liveData ? `${Math.round(liveData.confidence * 100)}%` : '—'}</div>
+            </div>
+            <div className="col-span-2 border-t border-[#1f1f1f] pt-3">
+              <div className="flex justify-between text-[9px] uppercase tracking-widest text-[#777] mb-2"><span>Fake probability timeline</span><span>{liveData?.inference_ms ? `${liveData.inference_ms} ms inference` : 'Awaiting model'}</span></div>
+              <LiveProbabilityGraph history={liveHistory} />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="grid lg:grid-cols-12 gap-6">
         
@@ -1223,7 +1432,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                 {!isRecording ? (
                   <button 
                     onClick={startRecording}
-                    disabled={isAnalyzing}
+                    disabled={isAnalyzing || isLiveDetecting}
                     className="font-mono text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest uppercase bg-[#111] border border-[#333] text-[#f5f5f5] px-2.5 sm:px-4 py-2 hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <Mic className="w-3 h-3 shrink-0" /> Record Mic
@@ -1245,6 +1454,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
                     accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.webm" 
                     className="hidden" 
                     onChange={handleFileUpload}
+                    disabled={isLiveDetecting}
                   />
                 </label>
 
@@ -1619,6 +1829,63 @@ function DataModule({ title, value, isAlert }) {
         {value}
       </div>
     </div>
+  );
+}
+
+function LiveWaveform({ analyserRef, active }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const context = canvas.getContext('2d');
+    let frameId;
+    const render = () => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const scale = window.devicePixelRatio || 1;
+      if (canvas.width !== width * scale || canvas.height !== height * scale) {
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        context.setTransform(scale, 0, 0, scale, 0, 0);
+      }
+      context.fillStyle = '#070707';
+      context.fillRect(0, 0, width, height);
+      context.strokeStyle = active ? '#CCFF00' : '#444444';
+      context.lineWidth = 1.5;
+      context.beginPath();
+      const analyser = analyserRef.current;
+      const values = analyser ? new Uint8Array(analyser.fftSize) : null;
+      if (values) analyser.getByteTimeDomainData(values);
+      for (let index = 0; index < width; index += 1) {
+        const sourceIndex = values ? Math.floor(index * values.length / width) : 0;
+        const y = values ? ((values[sourceIndex] - 128) / 128) * height * 0.42 + height / 2 : height / 2;
+        if (index === 0) context.moveTo(index, y); else context.lineTo(index, y);
+      }
+      context.stroke();
+      frameId = requestAnimationFrame(render);
+    };
+    render();
+    return () => cancelAnimationFrame(frameId);
+  }, [active, analyserRef]);
+
+  return <canvas ref={canvasRef} className="block w-full h-24 border border-[#1f1f1f]" aria-label="Live microphone waveform" />;
+}
+
+function LiveProbabilityGraph({ history }) {
+  if (!history.length) return <div className="h-16 flex items-center justify-center border border-dashed border-[#222] text-[9px] text-[#555]">PREDICTIONS WILL APPEAR AFTER 2 SECONDS OF SPEECH</div>;
+  const viewWidth = 300;
+  const viewHeight = 64;
+  const points = history.slice(-60).map((frame, index, list) => {
+    const x = list.length === 1 ? viewWidth : index * viewWidth / (list.length - 1);
+    const y = viewHeight - (frame.smoothed_fake_probability * viewHeight);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} className="block w-full h-16 border border-[#1f1f1f] bg-[#070707]" preserveAspectRatio="none" aria-label="Smoothed fake probability over time">
+      <path d={`M0 ${viewHeight / 2} H${viewWidth}`} stroke="#333" strokeDasharray="3 3" />
+      <polyline points={points} fill="none" stroke="#CCFF00" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }
 

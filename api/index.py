@@ -6,11 +6,15 @@ Compatible with Vercel Serverless, Docker, and local uvicorn.
 """
 
 import os
+import asyncio
+import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+import numpy as np
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -18,6 +22,12 @@ from fastapi.responses import FileResponse, JSONResponse
 load_dotenv()
 
 from api.detector import DetectorManager
+from api.streaming_detector import SAMPLE_RATE, streaming_controller
+
+logger = logging.getLogger("vocalguard.api")
+MAX_STREAM_CHUNK_BYTES = int(os.getenv("STREAM_MAX_CHUNK_BYTES", str(256 * 1024)))
+MAX_STREAM_SECONDS = float(os.getenv("STREAM_MAX_SECONDS", "3600"))
+MAX_ACTIVE_STREAMS = int(os.getenv("STREAM_MAX_ACTIVE_SESSIONS", "16"))
 
 app = FastAPI(
     title="VocalGuard API",
@@ -56,7 +66,9 @@ def health_check():
         "device": str(detector.device),
         "threshold": detector.threshold,
         "checkpoint": Path(detector.checkpoint_path).name if detector.checkpoint_path else None,
-        "allowed_origins": origins
+        "allowed_origins": origins,
+        "streaming_enabled": True,
+        "streaming_active_sessions": streaming_controller.active_session_count,
     }
 
 
@@ -98,6 +110,92 @@ async def detect_audio(
             status_code=500,
             detail=f"Inference failed on file '{file.filename}': {str(e)}"
         )
+
+
+@app.websocket("/ws/detect")
+async def detect_live_audio(websocket: WebSocket):
+    """Process one isolated 16 kHz mono PCM microphone stream in memory.
+
+    Protocol: client sends a JSON `start` frame declaring `pcm_s16le`, then
+    binary little-endian int16 mono PCM frames. Server frames are JSON status,
+    prediction, and error messages. No microphone audio is written to disk.
+    """
+    if streaming_controller.active_session_count >= MAX_ACTIVE_STREAMS:
+        await websocket.close(code=1013, reason="Live stream capacity reached")
+        return
+
+    await websocket.accept()
+    session = streaming_controller.create_session()
+    started = False
+    logger.info("[STREAM:%s] WebSocket connected", session.session_id)
+    try:
+        await websocket.send_json({
+            "type": "status",
+            "session_id": session.session_id,
+            "state": "LISTENING",
+            "sample_rate": SAMPLE_RATE,
+            "window_seconds": 2.0,
+            "hop_seconds": 1.0,
+            "message": "Connected. Send PCM 16-bit mono audio at 16 kHz.",
+        })
+        while True:
+            message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+
+            text_payload = message.get("text")
+            binary_payload = message.get("bytes")
+            if text_payload is not None:
+                try:
+                    control = json.loads(text_payload)
+                except json.JSONDecodeError:
+                    await websocket.send_json({"type": "error", "code": "MALFORMED_CONTROL", "message": "Control frames must be valid JSON."})
+                    continue
+                action = control.get("type")
+                if action == "start":
+                    if control.get("format", "pcm_s16le") != "pcm_s16le" or control.get("sample_rate", SAMPLE_RATE) != SAMPLE_RATE or control.get("channels", 1) != 1:
+                        await websocket.send_json({"type": "error", "code": "UNSUPPORTED_FORMAT", "message": "Live detection requires pcm_s16le, 16 kHz, mono."})
+                        continue
+                    started = True
+                    await websocket.send_json({"type": "status", "session_id": session.session_id, "state": "BUFFERING", "buffered_seconds": 0.0, "target_seconds": 2.0})
+                elif action == "stop":
+                    await websocket.send_json({"type": "status", "session_id": session.session_id, "state": "STOPPED"})
+                    break
+                elif action == "ping":
+                    await websocket.send_json({"type": "pong", "session_id": session.session_id})
+                else:
+                    await websocket.send_json({"type": "error", "code": "UNKNOWN_CONTROL", "message": "Supported controls are start, stop, and ping."})
+                continue
+
+            if binary_payload is None:
+                continue
+            if not started:
+                await websocket.send_json({"type": "error", "code": "START_REQUIRED", "message": "Send a start frame before audio."})
+                continue
+            if not binary_payload or len(binary_payload) > MAX_STREAM_CHUNK_BYTES or len(binary_payload) % 2:
+                await websocket.send_json({"type": "error", "code": "INVALID_AUDIO_CHUNK", "message": "Audio chunks must be non-empty, even-length int16 PCM and within the size limit."})
+                continue
+
+            pcm = np.frombuffer(binary_payload, dtype="<i2").astype(np.float32) / 32768.0
+            if session.total_samples_received + len(pcm) > int(MAX_STREAM_SECONDS * SAMPLE_RATE):
+                await websocket.send_json({"type": "error", "code": "SESSION_LIMIT", "message": "Maximum live session duration reached."})
+                break
+            # Inference is CPU/GPU-bound; move it off the websocket event loop.
+            # Each connection awaits its result, so stale windows cannot queue up.
+            response = await asyncio.to_thread(session.ingest_audio_chunk, pcm)
+            if response:
+                await websocket.send_json(response)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.exception("[STREAM:%s] WebSocket stream failed", session.session_id)
+        try:
+            await websocket.send_json({"type": "error", "session_id": session.session_id, "code": "STREAM_FAILURE", "message": "Live analysis stopped because the server encountered an error."})
+        except Exception:
+            pass
+    finally:
+        streaming_controller.close_session(session.session_id)
+        logger.info("[STREAM:%s] WebSocket disconnected", session.session_id)
 
 
 @app.get("/api/samples")

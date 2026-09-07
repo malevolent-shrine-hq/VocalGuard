@@ -286,14 +286,26 @@ def load_audio_from_bytes_or_path(input_data: Any, filename: Optional[str] = Non
         up, down = SAMPLE_RATE // gcd, orig_sr // gcd
         audio = resample_poly(audio, up, down).astype(np.float32)
 
-    # Remove DC offset & normalize amplitude
-    if len(audio) > 0:
-        audio = audio - np.mean(audio)
-    max_abs = np.max(np.abs(audio)) if len(audio) else 0.0
-    if max_abs > 1e-8:
-        audio = audio / max_abs
+    audio = normalize_audio_for_inference(audio)
 
     return audio, orig_sr, duration
+
+
+def normalize_audio_for_inference(audio: np.ndarray) -> np.ndarray:
+    """Apply the waveform normalization used by every model inference path.
+
+    Keeping this small operation here prevents the streaming transport from
+    quietly drifting from file-upload preprocessing after it has already been
+    decoded/resampled to the model's native PCM format.
+    """
+    normalized = np.asarray(audio, dtype=np.float32).copy()
+    normalized = np.nan_to_num(normalized, nan=0.0, posinf=0.0, neginf=0.0)
+    if len(normalized):
+        normalized -= np.mean(normalized)
+    max_abs = np.max(np.abs(normalized)) if len(normalized) else 0.0
+    if max_abs > 1e-8:
+        normalized /= max_abs
+    return normalized
 
 
 # ------------------------------------------------------------

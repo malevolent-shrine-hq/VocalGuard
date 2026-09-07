@@ -57,6 +57,25 @@ cd api
 uvicorn index:app --reload --port 8000
 ```
 
+## Live microphone detection
+
+The Operations Console includes **Start live detection**. It opens one persistent
+WebSocket at `/ws/detect` and streams little-endian PCM signed 16-bit, 16 kHz,
+mono audio. The browser uses Web Audio capture and local resampling; the server
+keeps only a bounded in-memory rolling buffer, evaluates complete 2-second
+windows every second, and returns raw plus EMA-smoothed predictions. Live audio
+is never written to disk.
+
+For local development, Vite proxies both `/api` and `/ws` to the FastAPI server.
+For a separately deployed frontend, set `VITE_API_BASE_URL` and (when it differs)
+`VITE_WS_BASE_URL` to the API's HTTP/HTTPS and WS/WSS origins respectively.
+
+Optional backend controls: `STREAM_EMA_ALPHA` (default `0.35`),
+`STREAM_VAD_MIN_RMS` (default `0.003`), `STREAM_VAD_MIN_PEAK` (default `0.006`),
+`STREAM_RISK_MEDIUM_THRESHOLD` (default `0.15`),
+`STREAM_RISK_HIGH_THRESHOLD` (default `0.35`), `STREAM_MAX_CHUNK_BYTES`,
+`STREAM_MAX_SECONDS`, and `STREAM_MAX_ACTIVE_SESSIONS`.
+
 ## 👥 Engineering Team
 
 - **[Bimbok Mukherjee](https://github.com/Bimbok)** — PyTorch Model Architecture, DSP Pipeline & Backend Systems
@@ -65,4 +84,3 @@ uvicorn index:app --reload --port 8000
 
 ---
 *Engineered for All India Council for Technical Education (Cyber Security Cell) - SIH Problem Statement 26104.*
-
