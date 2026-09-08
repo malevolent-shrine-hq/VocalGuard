@@ -21,6 +21,7 @@
 - [1. System Overview](#1-system-overview)
   - [The Threat Vector](#the-threat-vector)
   - [The VocalGuard Solution](#the-vocalguard-solution)
+  - [System Data Flow (DFD Level 1)](#system-data-flow-dfd-level-1)
 - [2. Key Features](#2-key-features)
 - [3. Forensic Speech Benchmark & Evaluation](#3-forensic-speech-benchmark--evaluation)
   - [Evaluation Metrics (Fake-or-Real Benchmark)](#evaluation-metrics-fake-or-real-benchmark)
@@ -79,25 +80,48 @@ Traditional audio verification tools and human ears fail because these neural sy
 
 Rather than relying on resource-intensive multi-gigabyte large language models (LLMs) that analyze semantic transcriptions, VocalGuard inspects the fundamental physical acoustics of the speech signal. Operating on a **PyTorch Multi-Resolution SE-ResNet (v3)** deep learning architecture, VocalGuard extracts concurrent multi-scale spectrograms, applies anisotropic directional convolutions with Squeeze-and-Excitation channel attention, and performs multi-statistic pooling to expose vocoder artifacts, phase discontinuities, and unnatural pitch rigidity.
 
-```
-       [ Voice Audio Stream / Uploaded File ]
-                         │
-                         ▼
-        ┌──────────────────────────────────┐
-        │  VocalGuard FastAPI Core Engine  │
-        │  • Polyphase Resample (16 kHz)   │
-        │  • VAD Energy Gating (RMS/Peak)  │
-        │  • 3-Channel Multi-Res STFT      │
-        │  • Asymmetric SE-ResNet v3       │
-        │  • 768-D Multi-Stat Pooling      │
-        │  • Calibrated Decision (τ=0.0509)│
-        └──────────────────────────────────┘
-                         │
-         ┌───────────────┴───────────────┐
-         ▼                               ▼
-    [ REAL HUMAN ]               [ SYNTHETIC FAKE ]
- (Natural Glottal Resets,     (Vocoder Phase Shifts,
-  Dynamic Timbre, Micro-Jitter) Unnatural Harmonics, Clicks)
+### System Data Flow (DFD Level 1)
+
+```mermaid
+flowchart TD
+    %% External Entities
+    User["👤 User / Analyst"]
+    Mic["🎙️ Microphone Hardware"]
+
+    %% Processes (4 Core Stages)
+    P1(["1.0 Audio Ingestion & Web Console"])
+    P2(["2.0 Preprocessing & Silence Filter"])
+    P3(["3.0 Neural Deepfake Detection"])
+    P4(["4.0 Threat Scoring & Decision"])
+
+    %% Data Stores
+    D1[("Buffer: Live Audio Stream")]
+    D2[("Model: PyTorch SE-ResNet")]
+
+    %% Data Flows
+    User -->|"Upload Audio File"| P1
+    Mic -->|"Live Microphone Audio"| P1
+
+    P1 -->|"Store Stream Chunks"| D1
+    D1 -->|"2.0s Sliding Window"| P2
+    P1 -->|"Uploaded File Stream"| P2
+
+    P2 -->|"Clean 16 kHz Speech Tensor"| P3
+    D2 -.->|"Model Weights (12.8 MB)"| P3
+
+    P3 -->|"Raw AI Confidence (0 - 100%)"| P4
+    P4 -->|"Verdict, Risk Level & Telemetry"| P1
+
+    P1 -->|"Display Waveform & Final Verdict"| User
+
+    %% Styling
+    classDef entity fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef process fill:#0f172a,stroke:#ccff00,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef store fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#ffffff;
+
+    class User,Mic entity;
+    class P1,P2,P3,P4 process;
+    class D1,D2 store;
 ```
 
 ---
