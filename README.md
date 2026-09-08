@@ -22,6 +22,7 @@
   - [The Threat Vector](#the-threat-vector)
   - [The VocalGuard Solution](#the-vocalguard-solution)
   - [System Data Flow (DFD Level 1)](#system-data-flow-dfd-level-1)
+  - [System Activity Diagram](#system-activity-diagram)
 - [2. Key Features](#2-key-features)
 - [3. Forensic Speech Benchmark & Evaluation](#3-forensic-speech-benchmark--evaluation)
   - [Evaluation Metrics (Fake-or-Real Benchmark)](#evaluation-metrics-fake-or-real-benchmark)
@@ -122,6 +123,46 @@ flowchart TD
     class User,Mic entity;
     class P1,P2,P3,P4 process;
     class D1,D2 store;
+```
+
+### System Activity Diagram
+
+```mermaid
+flowchart TD
+    %% Initial & Final States
+    Start([● Start])
+    EndNode([◉ End])
+
+    %% Activities
+    A1["1. Select Input: Upload File or Live Mic"]
+    A2["2. Standardize Audio (16 kHz Mono PCM)"]
+    A3{"Speech Detected?\n(VAD Energy Gate)"}
+    A4["3. Run 3-STFT & SE-ResNet Inference"]
+    A5["Bypass CNN & Decay Threat Score"]
+    A6["4. Evaluate Threshold (τ = 0.0509) & Smooth"]
+    A7["5. Render REAL / FAKE Verdict & Waveform"]
+
+    %% Flow Transitions
+    Start --> A1
+    A1 --> A2
+    A2 --> A3
+    A3 -->|"Voiced Speech"| A4
+    A3 -->|"Silence / Room Tone"| A5
+    A4 --> A6
+    A5 --> A6
+    A6 --> A7
+    A7 --> EndNode
+
+    %% Styling
+    classDef action fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef decision fill:#1e1b4b,stroke:#f59e0b,stroke-width:2px,color:#ffffff;
+    classDef bypass fill:#1f2937,stroke:#94a3b8,stroke-width:1.5px,color:#cbd5e1;
+    classDef terminal fill:#050505,stroke:#ccff00,stroke-width:2px,color:#ccff00,font-weight:bold;
+
+    class Start,EndNode terminal;
+    class A1,A2,A4,A6,A7 action;
+    class A3 decision;
+    class A5 bypass;
 ```
 
 ---
