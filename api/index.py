@@ -151,11 +151,13 @@ async def detect_live_audio(websocket: WebSocket):
                 except json.JSONDecodeError:
                     await websocket.send_json({"type": "error", "code": "MALFORMED_CONTROL", "message": "Control frames must be valid JSON."})
                     continue
-                action = control.get("type")
+                action = control.get("type") or control.get("action")
                 if action == "start":
-                    if control.get("format", "pcm_s16le") != "pcm_s16le" or control.get("sample_rate", SAMPLE_RATE) != SAMPLE_RATE or control.get("channels", 1) != 1:
-                        await websocket.send_json({"type": "error", "code": "UNSUPPORTED_FORMAT", "message": "Live detection requires pcm_s16le, 16 kHz, mono."})
+                    fmt = control.get("format", "pcm_s16le")
+                    if fmt not in ["pcm_s16le", "pcm_f32le", "f32le"] and control.get("sample_rate", SAMPLE_RATE) != SAMPLE_RATE:
+                        await websocket.send_json({"type": "error", "code": "UNSUPPORTED_FORMAT", "message": "Live detection requires 16 kHz PCM."})
                         continue
+                    session.audio_format = fmt
                     started = True
                     await websocket.send_json({"type": "status", "session_id": session.session_id, "state": "BUFFERING", "buffered_seconds": 0.0, "target_seconds": 2.0})
                 elif action == "stop":
@@ -163,20 +165,38 @@ async def detect_live_audio(websocket: WebSocket):
                     break
                 elif action == "ping":
                     await websocket.send_json({"type": "pong", "session_id": session.session_id})
+                elif action == "reset":
+                    session.reset()
+                    await websocket.send_json({"type": "reset_complete", "session_id": session.session_id})
+                elif action == "set_speaker":
+                    speaker_id = control.get("speaker_id")
+                    session.target_speaker_id = speaker_id
+                    await websocket.send_json({
+                        "type": "speaker_updated",
+                        "session_id": session.session_id,
+                        "target_speaker_id": speaker_id
+                    })
                 else:
-                    await websocket.send_json({"type": "error", "code": "UNKNOWN_CONTROL", "message": "Supported controls are start, stop, and ping."})
+                    await websocket.send_json({"type": "error", "code": "UNKNOWN_CONTROL", "message": f"Unsupported control action: {action}"})
                 continue
 
             if binary_payload is None:
                 continue
-            if not started:
-                await websocket.send_json({"type": "error", "code": "START_REQUIRED", "message": "Send a start frame before audio."})
-                continue
-            if not binary_payload or len(binary_payload) > MAX_STREAM_CHUNK_BYTES or len(binary_payload) % 2:
-                await websocket.send_json({"type": "error", "code": "INVALID_AUDIO_CHUNK", "message": "Audio chunks must be non-empty, even-length int16 PCM and within the size limit."})
+            started = True
+            if not binary_payload or len(binary_payload) > MAX_STREAM_CHUNK_BYTES:
+                await websocket.send_json({"type": "error", "code": "INVALID_AUDIO_CHUNK", "message": "Audio chunk exceeded size limit."})
                 continue
 
-            pcm = np.frombuffer(binary_payload, dtype="<i2").astype(np.float32) / 32768.0
+            if session.audio_format in ["pcm_f32le", "f32le"]:
+                if len(binary_payload) % 4 != 0:
+                    continue
+                pcm = np.frombuffer(binary_payload, dtype=np.float32)
+            else:
+                if len(binary_payload) % 2 != 0:
+                    continue
+                pcm = np.frombuffer(binary_payload, dtype="<i2").astype(np.float32) / 32768.0
+
+            pcm = np.clip(pcm, -1.0, 1.0)
             if session.total_samples_received + len(pcm) > int(MAX_STREAM_SECONDS * SAMPLE_RATE):
                 await websocket.send_json({"type": "error", "code": "SESSION_LIMIT", "message": "Maximum live session duration reached."})
                 break
@@ -228,7 +248,45 @@ def get_sample_file(filename: str):
         file_path = base / filename
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
-    raise HTTPException(status_code=404, detail=f"Sample '{filename}' not found.")
+# ============================================================
+# SPEAKER BIOMETRICS & VOICEPRINT ENROLLMENT API
+# ============================================================
+@app.get("/api/biometrics/profiles")
+def get_biometric_profiles():
+    """Returns list of enrolled VIP/CXO voiceprint profiles."""
+    from api.speaker_biometrics import biometrics_engine
+    return {"profiles": biometrics_engine.list_profiles()}
+
+
+@app.post("/api/biometrics/enroll")
+async def enroll_biometric_profile(
+    speaker_id: Optional[str] = Form(None),
+    name: str = Form(...),
+    role: str = Form("Executive"),
+    authorized_limit: str = Form("₹ 50,00,000"),
+    file: UploadFile = File(...)
+):
+    """Enrolls an executive's voice into the vault from an uploaded audio file or recording."""
+    from api.speaker_biometrics import biometrics_engine
+    from api.detector import load_audio_from_bytes_or_path
+    import re
+    if not speaker_id or not speaker_id.strip():
+        clean_name = re.sub(r'[^a-zA-Z0-9]+', '_', name.lower()).strip('_')
+        speaker_id = f"cxo_{clean_name}"
+    audio_bytes = await file.read()
+    audio, _, _ = load_audio_from_bytes_or_path(audio_bytes, file.filename)
+    result = biometrics_engine.enroll_speaker(speaker_id, name, role, audio, authorized_limit)
+    return result
+
+
+@app.delete("/api/biometrics/profiles/{speaker_id}")
+def delete_biometric_profile(speaker_id: str):
+    """Deletes an enrolled voiceprint profile."""
+    from api.speaker_biometrics import biometrics_engine
+    success = biometrics_engine.delete_profile(speaker_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return {"status": "success", "message": f"Deleted profile {speaker_id}"}
 
 
 if __name__ == "__main__":

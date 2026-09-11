@@ -5,7 +5,8 @@ import {
   Upload, RefreshCw, Mic, CheckCircle2,
   Download, AlertOctagon, Radio,
   Terminal, FileAudio, ChevronDown, ChevronUp, Loader2,
-  ArrowUpRight, Shield, Code2, Menu, X
+  ArrowUpRight, Shield, Code2, Menu, X,
+  Fingerprint, UserCheck, UserX, UserPlus, ShieldAlert, ShieldCheck, Trash2
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -734,6 +735,16 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
   const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Speaker Biometrics & Voiceprint Vault States
+  const [enrolledProfiles, setEnrolledProfiles] = useState([]);
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState('cxo_vikram_sharma');
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const selectedSpeakerIdRef = useRef(selectedSpeakerId);
+
+  useEffect(() => {
+    selectedSpeakerIdRef.current = selectedSpeakerId;
+  }, [selectedSpeakerId]);
+
   const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -759,6 +770,66 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
     const newEntry = { id: logCounterRef.current, time: timeStr, tag, msg, type };
     setTerminalLogs(prev => [...prev.slice(-49), newEntry]);
   }, []);
+
+  const fetchProfiles = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/biometrics/profiles`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && Array.isArray(data.profiles)) {
+        setEnrolledProfiles(data.profiles);
+        if (data.profiles.length > 0) {
+          setSelectedSpeakerId(prev => {
+            const exists = data.profiles.some(p => p.speaker_id === prev);
+            return exists ? prev : data.profiles[0].speaker_id;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch profiles:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`${API_BASE}/api/biometrics/profiles`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!isMounted || !data || !Array.isArray(data.profiles)) return;
+        setEnrolledProfiles(data.profiles);
+        if (data.profiles.length > 0) {
+          setSelectedSpeakerId(prev => {
+            const exists = data.profiles.some(p => p.speaker_id === prev);
+            return exists ? prev : data.profiles[0].speaker_id;
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleSelectSpeaker = useCallback((speakerId) => {
+    setSelectedSpeakerId(speakerId);
+    const socket = liveSocketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'set_speaker', speaker_id: speakerId || null }));
+      const targetName = enrolledProfiles.find(p => p.speaker_id === speakerId)?.name || (speakerId ? speakerId : 'None');
+      addLog('BIOMETRIC', `Active target identity switched to: ${targetName}`, 'info');
+    }
+  }, [addLog, enrolledProfiles]);
+
+  const handleDeleteProfile = useCallback(async (speakerId) => {
+    if (!window.confirm(`Delete voiceprint profile "${speakerId}" from vault?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/biometrics/profiles/${speakerId}`, { method: 'DELETE' });
+      if (res.ok) {
+        addLog('BIOMETRIC', `Deleted profile from vault: ${speakerId}`, 'warning');
+        await fetchProfiles();
+      }
+    } catch (err) {
+      console.error('Delete profile error:', err);
+    }
+  }, [addLog, fetchProfiles]);
 
   const releaseLiveResources = useCallback(() => {
     if (liveTimerRef.current) clearInterval(liveTimerRef.current);
@@ -831,6 +902,9 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       socket.onopen = () => {
         if (liveStoppingRef.current) return;
         socket.send(JSON.stringify({ type: 'start', format: 'pcm_s16le', sample_rate: 16000, channels: 1 }));
+        if (selectedSpeakerIdRef.current) {
+          socket.send(JSON.stringify({ type: 'set_speaker', speaker_id: selectedSpeakerIdRef.current }));
+        }
         source.connect(analyser);
         analyser.connect(processor);
         processor.connect(mute);
@@ -857,7 +931,12 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           setLiveData(frame);
           setLivePhase(frame.state || 'ANALYZING');
           setLiveHistory(history => [...history.slice(-(MAX_LIVE_HISTORY - 1)), frame]);
-          addLog('LIVE', `Window ${frame.window_start}s–${frame.window_end}s: fake ${frame.fake_percentage}% (EMA ${frame.smoothed_percentage}%).`, frame.is_fake ? 'danger' : 'success');
+          if (frame.composite_verdict) {
+            const isDanger = frame.composite_risk === 'HIGH';
+            addLog('SECURITY', `[${frame.composite_verdict}] Fake: ${frame.fake_percentage}% | Match: ${frame.biometrics?.identity_match_percentage ?? '—'}% → ${frame.action_mandated}`, isDanger ? 'danger' : 'success');
+          } else {
+            addLog('LIVE', `Window ${frame.window_start}s–${frame.window_end}s: fake ${frame.fake_percentage}% (EMA ${frame.smoothed_percentage}%).`, frame.is_fake ? 'danger' : 'success');
+          }
         } else if (frame.type === 'status') {
           setLivePhase(frame.state || 'LISTENING');
         } else if (frame.type === 'error') {
@@ -1330,46 +1409,204 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       </div>
 
       <section className="mb-6 tech-panel bg-black border-[#2a2a2a] overflow-hidden">
+        {/* Top Header: Status & Live Controls */}
         <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#1f1f1f]">
           <div>
             <div className="flex items-center gap-2 font-mono text-xs tracking-widest uppercase text-[#CCFF00]">
               <span className={`w-2 h-2 rounded-full ${isLiveDetecting ? 'bg-[#CCFF00] animate-pulse' : 'bg-[#555]'}`} />
-              Live voice monitor
+              Live Voice Forensics & Cross-Session Biometrics
             </div>
-            <p className="font-mono text-[10px] text-[#777] mt-1">PCM 16 kHz mono → 2.0s rolling context → prediction every 1.0s. Audio remains in memory.</p>
+            <p className="font-mono text-[10px] text-[#777] mt-1">
+              PCM 16 kHz mono → 2.0s rolling context → Dual-Factor Verification: Neural Deepfake CNN + 128-D Voiceprint Consistency.
+            </p>
           </div>
-          <button
-            onClick={isLiveDetecting ? () => stopLiveDetection() : startLiveDetection}
-            disabled={isAnalyzing || isRecording || livePhase === 'CONNECTING'}
-            className={`font-mono text-xs uppercase tracking-widest font-bold px-5 py-3 transition-colors disabled:opacity-50 ${isLiveDetecting ? 'bg-[#FF3333] text-black hover:bg-white' : 'bg-[#CCFF00] text-black hover:bg-white'}`}
-          >
-            {livePhase === 'CONNECTING' ? 'Connecting…' : isLiveDetecting ? `Stop live detection (${liveSeconds}s)` : 'Start live detection'}
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <button
+              onClick={() => setIsEnrollModalOpen(true)}
+              className="font-mono text-xs uppercase tracking-wider px-3 sm:px-3.5 py-2.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#CCFF00] transition-colors flex items-center gap-2"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-[#CCFF00]" />
+              <span className="hidden sm:inline">Enroll CXO Profile</span>
+              <span className="sm:inline hidden text-[10px] text-[#666]">({enrolledProfiles.length})</span>
+              <span className="sm:hidden">Vault ({enrolledProfiles.length})</span>
+            </button>
+            <button
+              onClick={isLiveDetecting ? () => stopLiveDetection() : startLiveDetection}
+              disabled={isAnalyzing || isRecording || livePhase === 'CONNECTING'}
+              className={`font-mono text-xs uppercase tracking-widest font-bold px-4 sm:px-5 py-2.5 sm:py-3 transition-colors disabled:opacity-50 ${isLiveDetecting ? 'bg-[#FF3333] text-black hover:bg-white' : 'bg-[#CCFF00] text-black hover:bg-white'}`}
+            >
+              {livePhase === 'CONNECTING' ? 'Connecting…' : isLiveDetecting ? `Stop live detection (${liveSeconds}s)` : 'Start live detection'}
+            </button>
+          </div>
         </div>
+
+        {/* Target CXO Selector Ribbon */}
+        <div className="px-4 sm:px-5 py-2.5 bg-[#080808] border-b border-[#1a1a1a] flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono text-xs">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="flex items-center gap-1.5 text-[#888] uppercase tracking-wider text-[11px]">
+              <Fingerprint className="w-3.5 h-3.5 text-[#00E5FF]" /> Target Executive Profile:
+            </span>
+            <select
+              value={selectedSpeakerId}
+              onChange={(e) => handleSelectSpeaker(e.target.value)}
+              className="bg-[#111] text-white border border-[#333] px-2.5 py-1 text-xs focus:border-[#CCFF00] focus:outline-none max-w-xs sm:max-w-md truncate"
+            >
+              {enrolledProfiles.map((p) => (
+                <option key={p.speaker_id} value={p.speaker_id}>
+                  {p.name} — {p.role} ({p.authorized_limit})
+                </option>
+              ))}
+              <option value="">-- No Target (General Deepfake Only) --</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-[#777]">
+            <span>Vault:</span>
+            <span className="text-[#CCFF00] font-bold">{enrolledProfiles.length} Enrolled</span>
+            <span className="text-[#444]">|</span>
+            <span>Target Limit:</span>
+            <span className="text-white font-medium">
+              {enrolledProfiles.find(p => p.speaker_id === selectedSpeakerId)?.authorized_limit || 'Standard'}
+            </span>
+          </div>
+        </div>
+
+        {/* Composite Security Verdict Banner (When evaluated or live active) */}
+        {liveData?.composite_verdict && (
+          <div className={`px-4 sm:px-5 py-3 border-b font-mono transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+            liveData.composite_verdict === 'CLONED_DEEPFAKE_ATTACK'
+              ? 'bg-[#FF3333]/15 border-[#FF3333] text-[#FF3333]'
+              : liveData.composite_verdict === 'UNAUTHORIZED_HUMAN_IMPOSTER'
+              ? 'bg-amber-500/15 border-amber-500 text-amber-300'
+              : liveData.composite_verdict === 'VERIFIED_AUTHORIZED_CALLER'
+              ? 'bg-[#CCFF00]/10 border-[#CCFF00]/50 text-[#CCFF00]'
+              : 'bg-[#111] border-[#222] text-[#aaa]'
+          }`}>
+            <div className="flex items-start sm:items-center gap-3">
+              {liveData.composite_verdict === 'CLONED_DEEPFAKE_ATTACK' && <ShieldAlert className="w-5 h-5 shrink-0 text-[#FF3333] animate-pulse mt-0.5 sm:mt-0" />}
+              {liveData.composite_verdict === 'UNAUTHORIZED_HUMAN_IMPOSTER' && <UserX className="w-5 h-5 shrink-0 text-amber-400 mt-0.5 sm:mt-0" />}
+              {liveData.composite_verdict === 'VERIFIED_AUTHORIZED_CALLER' && <ShieldCheck className="w-5 h-5 shrink-0 text-[#CCFF00] mt-0.5 sm:mt-0" />}
+              {liveData.composite_verdict === 'GENUINE_HUMAN_VOICE' && <UserCheck className="w-5 h-5 shrink-0 text-white mt-0.5 sm:mt-0" />}
+              <div>
+                <div className="font-bold text-xs sm:text-sm tracking-wide flex items-center gap-2">
+                  <span>SECURITY VERDICT: {liveData.composite_verdict.replace(/_/g, ' ')}</span>
+                </div>
+                <div className="text-[10px] opacity-80 mt-0.5">
+                  {liveData.composite_verdict === 'CLONED_DEEPFAKE_ATTACK' && `Neural vocoder artifacts identified (${liveData.fake_percentage}% synthetic probability vs 5.09% calibrated threshold). High-risk voice cloning attack.`}
+                  {liveData.composite_verdict === 'UNAUTHORIZED_HUMAN_IMPOSTER' && `Acoustic voice is organic human, but vocal tract biometrics (${liveData.biometrics?.identity_match_percentage ?? 0}%) DO NOT match authorized identity "${liveData.biometrics?.speaker_name}".`}
+                  {liveData.composite_verdict === 'VERIFIED_AUTHORIZED_CALLER' && `Dual criteria satisfied: Organic human speech confirmed (${liveData.fake_percentage}% fake) & Identity verified with ${liveData.biometrics?.speaker_name} (${liveData.biometrics?.identity_match_percentage}% match).`}
+                  {liveData.composite_verdict === 'GENUINE_HUMAN_VOICE' && 'Organic human speech verified. No specific executive identity target selected for biometrics.'}
+                  {liveData.composite_verdict === 'AMBIENT_NOISE_CNN_GATED' && 'Ambient background silence detected; inference gated until voiced speech is present.'}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              <span className="text-[9px] uppercase tracking-wider opacity-70">Mandate:</span>
+              <span className={`px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase border ${
+                liveData.composite_risk === 'HIGH'
+                  ? 'bg-[#FF3333] text-black border-[#FF3333]'
+                  : 'bg-[#CCFF00] text-black border-[#CCFF00]'
+              }`}>
+                {liveData.action_mandated ? liveData.action_mandated.replace(/_/g, ' ') : 'MONITORING'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Dual Gauges & Waveform Grid */}
         <div className="grid md:grid-cols-12 gap-0">
-          <div className="md:col-span-7 p-4 sm:p-5 border-b md:border-b-0 md:border-r border-[#1f1f1f]">
+          {/* Waveform Column */}
+          <div className="md:col-span-6 p-4 sm:p-5 border-b md:border-b-0 md:border-r border-[#1f1f1f]">
             <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider mb-3">
               <span className="text-[#888]">Microphone waveform</span>
               <span className={livePhase === 'ERROR' ? 'text-[#FF3333]' : 'text-[#CCFF00]'}>{livePhase}</span>
             </div>
             <LiveWaveform analyserRef={liveAnalyserRef} active={isLiveDetecting} />
-            {livePhase === 'BUFFERING' && <div className="mt-2 font-mono text-[10px] text-[#888]">Collecting the first complete 2-second speech window…</div>}
-            {livePhase === 'NO_SPEECH' && <div className="mt-2 font-mono text-[10px] text-amber-300">No speech detected; the CNN is gated until voiced audio arrives.</div>}
+            {livePhase === 'BUFFERING' && <div className="mt-2 font-mono text-[10px] text-[#888]">Collecting initial 2-second speech window…</div>}
+            {livePhase === 'NO_SPEECH' && <div className="mt-2 font-mono text-[10px] text-amber-300">Ambient silence detected; model gated until voiced speech arrives.</div>}
             {livePhase === 'ERROR' && <div className="mt-2 font-mono text-[10px] text-[#FF3333]">{errorMessage}</div>}
           </div>
-          <div className="md:col-span-5 p-4 sm:p-5 grid grid-cols-2 gap-4 font-mono">
-            <div>
-              <div className="text-[9px] uppercase tracking-widest text-[#777]">Fake probability</div>
-              <div className={`text-3xl sm:text-4xl font-bold ${liveData?.is_fake ? 'text-[#FF3333]' : 'text-white'}`}>{liveData ? `${liveData.fake_percentage}%` : '—'}</div>
-              <div className="text-[9px] text-[#777] mt-1">EMA: {liveData ? `${liveData.smoothed_percentage}%` : '—'}</div>
+
+          {/* Dual Gauges Column */}
+          <div className="md:col-span-6 p-4 sm:p-5 space-y-4 font-mono">
+            {/* Dual Gauges Row */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {/* Gauge 1: Synthetic Voice Probability */}
+              <div className="p-3 bg-[#0a0a0a] border border-[#1f1f1f]">
+                <div className="flex items-center justify-between text-[9px] uppercase tracking-widest text-[#777] mb-1">
+                  <span>Synthetic Voice</span>
+                  <span className={liveData?.is_fake ? 'text-[#FF3333]' : 'text-[#CCFF00]'}>
+                    {liveData ? (liveData.is_fake ? 'DEEPFAKE' : 'ORGANIC') : 'STANDBY'}
+                  </span>
+                </div>
+                <div className={`text-2xl sm:text-3xl font-bold ${liveData?.is_fake ? 'text-[#FF3333]' : 'text-white'}`}>
+                  {liveData ? `${liveData.fake_percentage}%` : '—'}
+                </div>
+                {/* Horizontal Meter Bar */}
+                <div className="w-full bg-[#1c1c1c] h-1.5 mt-2 relative overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${liveData?.is_fake ? 'bg-[#FF3333]' : 'bg-[#CCFF00]'}`}
+                    style={{ width: `${Math.min(100, liveData?.fake_percentage || 0)}%` }}
+                  />
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-[#FF3333]" style={{ left: '5.09%' }} title="Threshold τ = 5.09%" />
+                </div>
+                <div className="flex justify-between text-[8px] text-[#666] mt-1.5">
+                  <span>EMA: {liveData ? `${liveData.smoothed_percentage}%` : '—'}</span>
+                  <span>τ = 5.09%</span>
+                </div>
+              </div>
+
+              {/* Gauge 2: Speaker Voiceprint Match */}
+              <div className="p-3 bg-[#0a0a0a] border border-[#1f1f1f]">
+                <div className="flex items-center justify-between text-[9px] uppercase tracking-widest text-[#777] mb-1">
+                  <span>Voiceprint Match</span>
+                  <span className={
+                    !liveData?.biometrics?.enrolled ? 'text-[#777]'
+                    : liveData.biometrics.is_identity_verified ? 'text-[#CCFF00]'
+                    : liveData.biometrics.identity_match_percentage >= 50 ? 'text-amber-400'
+                    : 'text-[#FF3333]'
+                  }>
+                    {!liveData?.biometrics?.enrolled ? 'NO TARGET'
+                    : liveData.biometrics.is_identity_verified ? 'MATCH'
+                    : liveData.biometrics.identity_match_percentage >= 50 ? 'UNCERTAIN'
+                    : 'MISMATCH'}
+                  </span>
+                </div>
+                <div className={`text-2xl sm:text-3xl font-bold ${
+                  !liveData?.biometrics?.enrolled ? 'text-[#555]'
+                  : liveData.biometrics.is_identity_verified ? 'text-[#CCFF00]'
+                  : liveData.biometrics.identity_match_percentage >= 50 ? 'text-amber-400'
+                  : 'text-[#FF3333]'
+                }`}>
+                  {liveData?.biometrics?.enrolled ? `${liveData.biometrics.identity_match_percentage}%` : '—'}
+                </div>
+                {/* Horizontal Meter Bar */}
+                <div className="w-full bg-[#1c1c1c] h-1.5 mt-2 relative overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      !liveData?.biometrics?.enrolled ? 'bg-[#444]'
+                      : liveData.biometrics.is_identity_verified ? 'bg-[#CCFF00]'
+                      : liveData.biometrics.identity_match_percentage >= 50 ? 'bg-amber-400'
+                      : 'bg-[#FF3333]'
+                    }`}
+                    style={{ width: `${Math.min(100, liveData?.biometrics?.identity_match_percentage || 0)}%` }}
+                  />
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-[#00E5FF]" style={{ left: '75%' }} title="Threshold ≥ 75%" />
+                </div>
+                <div className="flex justify-between text-[8px] text-[#666] mt-1.5">
+                  <span className="truncate max-w-[90px]" title={liveData?.biometrics?.speaker_name || enrolledProfiles.find(p => p.speaker_id === selectedSpeakerId)?.name || 'Vikram Sharma'}>
+                    {liveData?.biometrics?.speaker_name || enrolledProfiles.find(p => p.speaker_id === selectedSpeakerId)?.name || 'Vikram Sharma'}
+                  </span>
+                  <span>Pass: ≥ 75%</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="text-[9px] uppercase tracking-widest text-[#777]">Detection state</div>
-              <div className={`text-lg font-bold mt-2 ${liveData?.risk_level === 'HIGH' ? 'text-[#FF3333]' : liveData ? 'text-[#CCFF00]' : 'text-[#aaa]'}`}>{liveData?.state || livePhase}</div>
-              <div className="text-[9px] text-[#777] mt-2">Risk: {liveData?.risk_level || '—'} · confidence: {liveData ? `${Math.round(liveData.confidence * 100)}%` : '—'}</div>
-            </div>
-            <div className="col-span-2 border-t border-[#1f1f1f] pt-3">
-              <div className="flex justify-between text-[9px] uppercase tracking-widest text-[#777] mb-2"><span>Fake probability timeline</span><span>{liveData?.inference_ms ? `${liveData.inference_ms} ms inference` : 'Awaiting model'}</span></div>
+
+            {/* Timeline & Graph */}
+            <div className="border-t border-[#1f1f1f] pt-2">
+              <div className="flex justify-between text-[9px] uppercase tracking-widest text-[#777] mb-1.5">
+                <span>Dual Forensics Timeline</span>
+                <span>{liveData?.inference_ms ? `${liveData.inference_ms} ms latency` : 'Awaiting speech'}</span>
+              </div>
               <LiveProbabilityGraph history={liveHistory} />
             </div>
           </div>
@@ -1807,6 +2044,18 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           </div>
         </div>
 
+        {/* Enroll CXO Voiceprint Vault Modal */}
+        <EnrollExecutiveModal
+          isOpen={isEnrollModalOpen}
+          onClose={() => setIsEnrollModalOpen(false)}
+          onEnrolled={(newId) => {
+            fetchProfiles();
+            if (newId) handleSelectSpeaker(newId);
+          }}
+          enrolledProfiles={enrolledProfiles}
+          onDeleteProfile={handleDeleteProfile}
+        />
+
       </div>
     </div>
   );
@@ -1867,16 +2116,358 @@ function LiveProbabilityGraph({ history }) {
   if (!history.length) return <div className="h-16 flex items-center justify-center border border-dashed border-[#222] text-[9px] text-[#555]">PREDICTIONS WILL APPEAR AFTER 2 SECONDS OF SPEECH</div>;
   const viewWidth = 300;
   const viewHeight = 64;
-  const points = history.slice(-60).map((frame, index, list) => {
+  const slice = history.slice(-60);
+  const fakePoints = slice.map((frame, index, list) => {
     const x = list.length === 1 ? viewWidth : index * viewWidth / (list.length - 1);
     const y = viewHeight - (frame.smoothed_fake_probability * viewHeight);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
+
+  const bioPoints = slice.map((frame, index, list) => {
+    const x = list.length === 1 ? viewWidth : index * viewWidth / (list.length - 1);
+    const bioPercent = (frame.biometrics?.identity_match_percentage ?? 0) / 100.0;
+    const y = viewHeight - (bioPercent * viewHeight);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
   return (
-    <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} className="block w-full h-16 border border-[#1f1f1f] bg-[#070707]" preserveAspectRatio="none" aria-label="Smoothed fake probability over time">
-      <path d={`M0 ${viewHeight / 2} H${viewWidth}`} stroke="#333" strokeDasharray="3 3" />
-      <polyline points={points} fill="none" stroke="#CCFF00" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div>
+      <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} className="block w-full h-16 border border-[#1f1f1f] bg-[#070707]" preserveAspectRatio="none" aria-label="Smoothed fake probability and voiceprint match over time">
+        {/* Baseline threshold for Fake (τ = 5.09%) */}
+        <path d={`M0 ${viewHeight * (1 - 0.0509)} H${viewWidth}`} stroke="#FF3333" strokeDasharray="3 3" strokeOpacity="0.4" />
+        {/* Pass threshold for Biometrics (75%) */}
+        <path d={`M0 ${viewHeight * (1 - 0.75)} H${viewWidth}`} stroke="#00E5FF" strokeDasharray="3 3" strokeOpacity="0.4" />
+        {/* Biometrics trace (cyan dashed) */}
+        <polyline points={bioPoints} fill="none" stroke="#00E5FF" strokeWidth="1.5" strokeDasharray="4 2" vectorEffect="non-scaling-stroke" />
+        {/* Fake probability trace (lime solid) */}
+        <polyline points={fakePoints} fill="none" stroke="#CCFF00" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="flex items-center justify-between text-[8px] text-[#777] font-mono mt-1">
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 bg-[#CCFF00]" /> Fake Prob (τ=5.09%)</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 bg-[#00E5FF] border-b border-dashed" /> Voiceprint Match (Pass ≥ 75%)</span>
+      </div>
+    </div>
+  );
+}
+
+function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, onDeleteProfile }) {
+  const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'record'
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('Chief Financial Officer');
+  const [authorizedLimit, setAuthorizedLimit] = useState('₹ 5,00,00,000');
+  const [file, setFile] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordedBlob, setRecordedBlob] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordTimerRef = useRef(null);
+
+  const handleCloseModal = () => {
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    onClose();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
+  const startRecording = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setRecordedBlob(null);
+    audioChunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        setRecordedBlob(blob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      recorder.start(100);
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000);
+    } catch (err) {
+      setErrorMsg('Microphone permission denied: ' + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!name.trim()) {
+      setErrorMsg('Please enter executive full name.');
+      return;
+    }
+
+    const audioToUpload = activeTab === 'upload' ? file : recordedBlob;
+    if (!audioToUpload) {
+      setErrorMsg(activeTab === 'upload' ? 'Please select an audio file (.wav, .mp3, .m4a).' : 'Please record at least 2-3 seconds of speech.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('name', name.trim());
+      formData.append('role', role.trim());
+      formData.append('authorized_limit', authorizedLimit.trim());
+      const fileName = activeTab === 'upload' ? (file.name || 'reference.wav') : 'recorded_sample.wav';
+      formData.append('file', audioToUpload, fileName);
+
+      const res = await fetch(`${API_BASE}/api/biometrics/enroll`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Voiceprint enrollment failed.');
+      }
+      setSuccessMsg(`Successfully enrolled ${name}! 128-D voiceprint committed to vault.`);
+      setName('');
+      setFile(null);
+      setRecordedBlob(null);
+      if (onEnrolled) onEnrolled(data.speaker_id);
+    } catch (err) {
+      setErrorMsg(err.message || 'Enrollment error.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-[#0a0a0a] border border-[#2a2a2a] max-w-2xl w-full max-h-[90vh] overflow-y-auto font-mono text-white p-4 sm:p-6 shadow-2xl relative">
+        {/* Modal Header */}
+        <div className="flex items-start justify-between border-b border-[#1f1f1f] pb-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#CCFF00]/10 border border-[#CCFF00]/30 text-[#CCFF00]">
+              <Fingerprint className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-widest text-[#CCFF00]">// Biometric Vault</div>
+              <h3 className="text-base sm:text-lg font-bold uppercase tracking-tight text-white">Enroll Executive Voiceprint</h3>
+            </div>
+          </div>
+          <button 
+            onClick={handleCloseModal}
+            className="text-[#666] hover:text-white transition-colors p-1 border border-transparent hover:border-[#333]"
+            aria-label="Close modal"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* DPDP Compliance Notice */}
+        <div className="p-3 bg-[#111] border border-[#222] text-[10px] text-[#888] leading-relaxed mb-4">
+          <span className="text-[#CCFF00] font-bold">DPDP Act Privacy Compliant:</span> Raw audio is processed strictly in-memory into a 128-dimensional acoustic sub-band feature vector. No raw audio files are permanently retained in the biometric vault.
+        </div>
+
+        {/* Notifications */}
+        {errorMsg && (
+          <div className="mb-4 p-2.5 bg-[#FF3333]/15 border border-[#FF3333] text-[#FF3333] text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+        {successMsg && (
+          <div className="mb-4 p-2.5 bg-[#CCFF00]/15 border border-[#CCFF00] text-[#CCFF00] text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Enrollment Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">Executive Full Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Vikram Sharma"
+                required
+                className="w-full bg-[#111] border border-[#333] px-3 py-2 text-xs text-white placeholder-[#555] focus:border-[#CCFF00] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">Corporate Role / Designation *</label>
+              <input
+                type="text"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g. Chief Financial Officer"
+                required
+                className="w-full bg-[#111] border border-[#333] px-3 py-2 text-xs text-white placeholder-[#555] focus:border-[#CCFF00] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">Authorized Transaction Limit *</label>
+            <input
+              type="text"
+              value={authorizedLimit}
+              onChange={(e) => setAuthorizedLimit(e.target.value)}
+              placeholder="e.g. ₹ 5,00,00,000"
+              required
+              className="w-full bg-[#111] border border-[#333] px-3 py-2 text-xs text-white placeholder-[#555] focus:border-[#CCFF00] focus:outline-none"
+            />
+          </div>
+
+          {/* Audio Input Tabs */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">Reference Audio Sample *</label>
+            <div className="flex border-b border-[#222] mb-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('upload')}
+                className={`px-3 py-1.5 text-xs font-mono tracking-wider uppercase border-b-2 transition-colors ${activeTab === 'upload' ? 'border-[#CCFF00] text-[#CCFF00]' : 'border-transparent text-[#666] hover:text-[#aaa]'}`}
+              >
+                Upload File (.wav/.mp3/.m4a)
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('record')}
+                className={`px-3 py-1.5 text-xs font-mono tracking-wider uppercase border-b-2 transition-colors ${activeTab === 'record' ? 'border-[#CCFF00] text-[#CCFF00]' : 'border-transparent text-[#666] hover:text-[#aaa]'}`}
+              >
+                Record Live Microphone
+              </button>
+            </div>
+
+            {activeTab === 'upload' ? (
+              <div className="p-4 border border-dashed border-[#333] bg-[#0d0d0d] text-center">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  className="block w-full text-xs text-[#888] file:mr-3 file:py-1.5 file:px-3 file:border-0 file:text-xs file:font-mono file:bg-[#222] file:text-white hover:file:bg-[#333] file:cursor-pointer"
+                />
+                {file && <div className="text-[10px] text-[#CCFF00] mt-2 font-mono">Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)</div>}
+              </div>
+            ) : (
+              <div className="p-4 border border-[#333] bg-[#0d0d0d] flex flex-col items-center justify-center gap-3">
+                <div className="text-center">
+                  <div className="text-xs text-white font-bold">
+                    {isRecording ? `Recording... (${recordSeconds}s)` : (recordedBlob ? `Sample Recorded (${recordSeconds}s)` : 'Speak 3-5 seconds of clear executive speech')}
+                  </div>
+                  <div className="text-[10px] text-[#777] mt-0.5">e.g. "This is Vikram Sharma authorizing treasury operations."</div>
+                </div>
+                {!isRecording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] hover:border-[#CCFF00] text-white text-xs uppercase tracking-wider flex items-center gap-2"
+                  >
+                    <Mic className="w-3.5 h-3.5 text-[#CCFF00]" /> Start Recording
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="px-4 py-2 bg-[#FF3333] text-black font-bold text-xs uppercase tracking-wider flex items-center gap-2 animate-pulse"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-black" /> Stop Recording ({recordSeconds}s)
+                  </button>
+                )}
+                {recordedBlob && (
+                  <div className="text-[10px] text-[#CCFF00] flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3 h-3" /> Audio clip captured ready for feature extraction
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Submit Actions */}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="px-4 py-2 bg-[#111] border border-[#333] text-xs uppercase tracking-wider text-[#aaa] hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || isRecording}
+              className="px-5 py-2 bg-[#CCFF00] hover:bg-white text-black font-bold text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 transition-colors"
+            >
+              {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Fingerprint className="w-3.5 h-3.5" />}
+              {isSubmitting ? 'Extracting 128-D Vector…' : 'Extract & Commit Voiceprint'}
+            </button>
+          </div>
+        </form>
+
+        {/* Existing Vault Profiles Section */}
+        <div className="border-t border-[#1f1f1f] mt-6 pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] uppercase tracking-wider text-[#888]">Currently Enrolled Executive Profiles ({enrolledProfiles.length})</span>
+            <span className="text-[9px] text-[#555]">VAULT ID: 128-D-EMB-V1</span>
+          </div>
+          {enrolledProfiles.length === 0 ? (
+            <div className="text-center py-4 text-[10px] text-[#666] border border-dashed border-[#222]">
+              No profiles enrolled yet.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {enrolledProfiles.map((p) => (
+                <div key={p.speaker_id} className="p-2.5 bg-[#080808] border border-[#1e1e1e] flex items-center justify-between gap-3 text-xs">
+                  <div className="min-w-0">
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>{p.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#aaa] border border-[#333]">{p.authorized_limit}</span>
+                    </div>
+                    <div className="text-[10px] text-[#666] truncate">{p.role} · {p.enrolled_at}</div>
+                  </div>
+                  <button
+                    onClick={() => onDeleteProfile(p.speaker_id)}
+                    className="p-1.5 text-[#666] hover:text-[#FF3333] hover:bg-[#FF3333]/10 border border-transparent hover:border-[#FF3333]/30 transition-colors"
+                    title={`Delete ${p.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

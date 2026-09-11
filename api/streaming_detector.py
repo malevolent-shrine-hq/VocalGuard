@@ -27,6 +27,7 @@ from api.detector import (
     DetectorManager,
     normalize_audio_for_inference,
 )
+from api.speaker_biometrics import biometrics_engine
 
 logger = logging.getLogger("vocalguard.streaming")
 if not logger.handlers:
@@ -104,6 +105,10 @@ class StreamingSession:
 
         # Bounded history for timeline/graph queries
         self.prediction_history: List[Dict[str, Any]] = []
+
+        # Target enrolled executive for speaker verification (defaults to seeded demo CXO)
+        self.target_speaker_id: Optional[str] = "cxo_vikram_sharma"
+        self.audio_format: str = "pcm_s16le"
 
         logger.info(f"[STREAM:{self.session_id}] Session initialized (τ={self.threshold:.4f}, α={self.ema_alpha})")
 
@@ -247,6 +252,10 @@ class StreamingSession:
                 "smoothed_fake_percentage": round(self.smoothed_fake_prob * 100, 2),
                 "risk_level": "LOW",
                 "inference_ms": eval_latency,
+                "biometrics": biometrics_engine.verify_live_chunk(self.target_speaker_id, np.zeros(16000, dtype=np.float32)),
+                "composite_verdict": "AMBIENT_NOISE_CNN_GATED",
+                "composite_risk": "LOW",
+                "action_mandated": "AWAIT_ACTIVE_SPEECH",
                 "message": "Ambient background / silence detected (CNN gated)."
             }
             return result
@@ -287,6 +296,31 @@ class StreamingSession:
             self.consecutive_threat_count += 1
         else:
             self.consecutive_threat_count = max(0, self.consecutive_threat_count - 1)
+
+        # ------------------------------------------------------------------
+        # Cross-Session Speaker Biometrics & Voiceprint Verification
+        # ------------------------------------------------------------------
+        bio_result = biometrics_engine.verify_live_chunk(self.target_speaker_id, window_audio)
+
+        # ------------------------------------------------------------------
+        # Dual-Factor Security Verdict Synthesis
+        # ------------------------------------------------------------------
+        if is_fake:
+            composite_verdict = "CLONED_DEEPFAKE_ATTACK"
+            composite_risk = "HIGH"
+            action_mandated = "HALT_WIRE_TRANSFER_TRIGGER_CALLBACK"
+        elif bio_result.get("enrolled") and not bio_result.get("is_identity_verified"):
+            composite_verdict = "UNAUTHORIZED_HUMAN_IMPOSTER"
+            composite_risk = "HIGH"
+            action_mandated = "MANDATE_STEP_UP_MFA_ALERT_SUPERVISOR"
+        elif bio_result.get("enrolled") and bio_result.get("is_identity_verified"):
+            composite_verdict = "VERIFIED_AUTHORIZED_CALLER"
+            composite_risk = "LOW"
+            action_mandated = "AUTHORIZE_TRANSACTION"
+        else:
+            composite_verdict = "GENUINE_HUMAN_VOICE"
+            composite_risk = "LOW"
+            action_mandated = "STANDARD_MONITORING"
 
         # ------------------------------------------------------------------
         # Application Risk Engine
@@ -340,7 +374,11 @@ class StreamingSession:
             "processing_latency_ms": inference_latency,
             "chunks_received": self.chunks_received,
             "buffered_seconds": round(self.buffer_len / SAMPLE_RATE, 3),
-            "model_version": "SE-ResNet-v3 (93.66% Acc)"
+            "model_version": "SE-ResNet-v3 (93.66% Acc)",
+            "biometrics": bio_result,
+            "composite_verdict": composite_verdict,
+            "composite_risk": composite_risk,
+            "action_mandated": action_mandated
         }
 
         # Maintain bounded history
@@ -351,7 +389,8 @@ class StreamingSession:
         logger.info(
             f"[STREAM:{self.session_id}] t={stream_duration_sec:5.1f}s | "
             f"Raw: {raw_fake_prob*100:5.1f}% | EMA: {self.smoothed_fake_prob*100:5.1f}% | "
-            f"State: {state:<9} | Risk: {risk_level:<6} | Latency: {inference_latency:4.1f}ms"
+            f"BioMatch: {bio_result.get('identity_match_percentage', 0):.1f}% | "
+            f"Verdict: {composite_verdict:<26} | Latency: {inference_latency:4.1f}ms"
         )
 
         return prediction_frame
