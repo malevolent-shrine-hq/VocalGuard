@@ -315,310 +315,369 @@ function TopoBackground() {
 }
 
 /* =========================================
-   NAVIGATION BAR
+   NAVIGATION BAR & CYBER HAMBURGER DRAWER
    ========================================= */
 function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend, auth }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    if (drawerOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [drawerOpen]);
+
+  const navigateTo = (view) => {
+    setActiveView(view);
+    setDrawerOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur border-b border-[#1f1f1f]">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
-        
-        <div 
-          className="flex items-center gap-2 sm:gap-4 cursor-pointer shrink-0"
-          onClick={() => {
-            setActiveView('dashboard');
-            setMobileMenuOpen(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        >
-          <div className="w-5 h-5 sm:w-6 sm:h-6 bg-[#CCFF00] flex items-center justify-center shrink-0">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-black" />
-          </div>
-          <span className="text-base sm:text-xl font-bold tracking-tighter uppercase text-white font-mono">
-            Vocal<span className="text-[#888888] font-light">Guard</span>
-          </span>
-          <span className="hidden lg:inline-block font-mono text-[9px] bg-[#111] text-[#888] border border-[#222] px-2 py-0.5">
-            MODEL: MULTI-RES-SE-RESNET-v3 (93.66% ACC)
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Desktop Status Badge & Ping Button */}
-          <div className="hidden md:flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px] sm:text-[10px] tracking-wider uppercase shrink-0 px-2 py-1 bg-[#0a0a0a] border border-[#222]">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
+    <>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-md border-b border-[#1f1f1f]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
+          
+          {/* Left: Brand Logo & Minimal Status Pill */}
+          <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+            <div 
+              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group"
+              onClick={() => navigateTo('landing')}
+              title="VocalGuard - Real-time Voice Deepfake Detection"
+            >
+              <div className="w-6 h-6 bg-[#CCFF00] flex items-center justify-center shrink-0 group-hover:bg-white transition-colors shadow-[0_0_10px_rgba(204,255,0,0.25)]">
+                <div className="w-2 h-2 bg-black" />
+              </div>
+              <span className="text-base sm:text-lg font-bold tracking-tighter uppercase text-white font-mono">
+                Vocal<span className="text-[#888888] font-light group-hover:text-[#CCFF00] transition-colors">Guard</span>
+              </span>
+            </div>
+
+            {/* Subtle Live API Status Badge */}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-[#0a0a0a] hover:bg-[#141414] border border-[#222] hover:border-[#333] transition-colors font-mono text-[10px] text-[#888] tracking-wider"
+              title="Click to view full telemetry & ping backend"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 backendStatus.online 
                   ? 'bg-[#CCFF00] animate-pulse' 
                   : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
               }`} />
-              <span className={
-                backendStatus.online 
-                  ? 'text-[#888]' 
-                  : (backendStatus.checking ? 'text-amber-400' : 'text-[#FF3333]')
-              }>
-                {backendStatus.online 
-                  ? (backendStatus.latencyMs ? `API ONLINE (${backendStatus.latencyMs}ms)` : 'API ONLINE')
-                  : (backendStatus.checking ? 'WAKING API...' : 'API ASLEEP')}
-              </span>
-            </div>
-
-            <button 
-              onClick={onRetryBackend}
-              disabled={backendStatus.checking}
-              className="flex items-center gap-1 text-[9px] sm:text-[10px] font-mono text-[#aaa] hover:text-[#CCFF00] uppercase tracking-wider border border-[#333] hover:border-[#CCFF00] px-2 py-1 bg-[#111] transition-all disabled:opacity-50 group shrink-0"
-              title="Ping backend / wake up Render instance (free tier spins down after 15m inactivity)"
-            >
-              <RefreshCw className={`w-3 h-3 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#777] group-hover:text-[#CCFF00]'}`} />
-              <span className="font-semibold">
-                {backendStatus.checking ? 'Pinging...' : 'Ping Server'}
+              <span className="uppercase font-semibold">
+                {backendStatus.online ? (backendStatus.latencyMs ? `${backendStatus.latencyMs}ms` : 'ONLINE') : (backendStatus.checking ? 'CONNECTING' : 'OFFLINE')}
               </span>
             </button>
           </div>
 
-          {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center gap-6 ml-2">
-            <NavLink label="Platform" active={activeView === 'landing'} onClick={() => { setActiveView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
-            <NavLink label="Architecture" active={activeView === 'technology'} onClick={() => { setActiveView('technology'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
-            <NavLink label="About" active={activeView === 'about'} onClick={() => { setActiveView('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
-            <NavLink label="Console" active={activeView === 'dashboard'} onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} isAccent />
-          </div>
+          {/* Right Section: Clean Nav Links + Console CTA + Auth + Hamburger */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Minimalist Desktop Text Links (Visible on large screens) */}
+            <div className="hidden lg:flex items-center gap-5 font-mono text-xs uppercase tracking-wider">
+              <button
+                onClick={() => navigateTo('landing')}
+                className={`transition-colors py-1 ${activeView === 'landing' ? 'text-[#CCFF00] font-bold' : 'text-[#888] hover:text-white'}`}
+              >
+                Platform
+              </button>
+              <button
+                onClick={() => navigateTo('technology')}
+                className={`transition-colors py-1 ${activeView === 'technology' ? 'text-[#CCFF00] font-bold' : 'text-[#888] hover:text-white'}`}
+              >
+                Architecture
+              </button>
+              <button
+                onClick={() => navigateTo('about')}
+                className={`transition-colors py-1 ${activeView === 'about' ? 'text-[#CCFF00] font-bold' : 'text-[#888] hover:text-white'}`}
+              >
+                About
+              </button>
+            </div>
 
-          {/* Clerk Auth Section (Desktop) */}
-          <div className="hidden md:flex items-center ml-2">
-            {auth?.isConfigured ? (
-              auth.isSignedIn ? (
-                <div className="flex items-center gap-2 pl-3 border-l border-[#222]">
-                  <div className="text-right hidden xl:block font-mono leading-none">
-                    <div className="text-[10px] text-white font-bold truncate max-w-[120px]">{auth.user.name}</div>
-                    <div className="text-[8px] text-[#CCFF00] uppercase tracking-widest mt-0.5">SECURED</div>
+            {/* Sleek Console Action Button (Guaranteed No Wrapping) */}
+            <button
+              onClick={() => navigateTo('dashboard')}
+              className={`font-mono text-xs font-bold uppercase tracking-wider px-3 sm:px-3.5 py-1.5 transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+                activeView === 'dashboard'
+                  ? 'bg-[#CCFF00] text-black shadow-[0_0_12px_rgba(204,255,0,0.35)]'
+                  : 'bg-[#111] hover:bg-[#CCFF00] text-white hover:text-black border border-[#333] hover:border-[#CCFF00]'
+              }`}
+            >
+              <Radio className={`w-3.5 h-3.5 shrink-0 ${activeView === 'dashboard' ? 'animate-pulse text-black' : 'text-[#CCFF00]'}`} />
+              <span>Console</span>
+            </button>
+
+            {/* Operator Auth Avatar / Sign-In */}
+            <div className="flex items-center pl-1 sm:pl-2 border-l border-[#222]">
+              {auth?.isConfigured ? (
+                auth.isSignedIn ? (
+                  <div className="flex items-center gap-2">
+                    <div className="text-right hidden xl:block font-mono leading-tight">
+                      <div className="text-[10px] text-white font-bold truncate max-w-[100px]">{auth.user.name}</div>
+                      <div className="text-[8px] text-[#CCFF00] uppercase tracking-widest">SECURED</div>
+                    </div>
+                    {auth.UserButton && <auth.UserButton afterSignOutUrl="/" />}
                   </div>
-                  {auth.UserButton && <auth.UserButton afterSignOutUrl="/" />}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 pl-3 border-l border-[#222]">
-                  {auth.SignInButton && (
+                ) : (
+                  auth.SignInButton && (
                     <auth.SignInButton mode="modal">
-                      <button className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1.5 border border-[#333] hover:border-[#CCFF00] text-white hover:text-[#CCFF00] bg-[#111] transition-colors flex items-center gap-1.5">
+                      <button className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1.5 border border-[#333] hover:border-[#CCFF00] text-white hover:text-[#CCFF00] bg-[#111] transition-colors flex items-center gap-1.5 whitespace-nowrap">
                         <User className="w-3 h-3 text-[#CCFF00]" />
-                        <span>Sign In</span>
+                        <span className="hidden sm:inline">Sign In</span>
                       </button>
                     </auth.SignInButton>
-                  )}
-                  {auth.SignUpButton && (
-                    <auth.SignUpButton mode="modal">
-                      <button className="hidden xl:flex font-mono text-[10px] uppercase tracking-wider px-2.5 py-1.5 bg-[#CCFF00] hover:bg-white text-black font-bold transition-colors">
-                        Register
-                      </button>
-                    </auth.SignUpButton>
-                  )}
-                </div>
-              )
-            ) : (
-              <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-[#0e0e0e] border border-[#222] text-[9px] font-mono text-[#777] ml-2" title="Clerk publishable key not provided in .env (running in guest mode)">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#555]" />
-                <span>GUEST MODE</span>
-              </div>
-            )}
+                  )
+                )
+              ) : (
+                <span className="text-[9px] font-mono text-[#555] px-1.5 py-0.5 bg-[#0e0e0e] border border-[#222]">GUEST</span>
+              )}
+            </div>
+
+            {/* Unified Hamburger Menu Button */}
+            <button
+              onClick={() => setDrawerOpen(prev => !prev)}
+              className={`p-2 font-mono text-xs uppercase tracking-wider border transition-all flex items-center gap-1.5 shrink-0 ${
+                drawerOpen
+                  ? 'bg-[#CCFF00] text-black border-[#CCFF00]'
+                  : 'bg-[#111] hover:bg-[#1a1a1a] text-white border-[#333] hover:border-[#CCFF00]'
+              }`}
+              title="System Menu & Telemetry"
+              aria-label="Toggle System Menu"
+            >
+              {drawerOpen ? (
+                <X className="w-4 h-4" />
+              ) : (
+                <Menu className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline font-bold text-[10px] tracking-widest">MENU</span>
+            </button>
           </div>
-
-          {/* Mobile Quick Status Pill */}
-          <button
-            onClick={onRetryBackend}
-            disabled={backendStatus.checking}
-            className="md:hidden flex items-center gap-1.5 text-[9px] font-mono border border-[#222] bg-[#0c0c0c] hover:border-[#CCFF00] px-2 py-1 text-[#aaa] transition-colors shrink-0"
-            title="Ping backend gateway"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              backendStatus.online 
-                ? 'bg-[#CCFF00]' 
-                : (backendStatus.checking ? 'bg-amber-400 animate-ping' : 'bg-[#FF3333]')
-            }`} />
-            <span className="uppercase">{backendStatus.online ? (backendStatus.latencyMs ? `${backendStatus.latencyMs}ms` : 'ONLINE') : (backendStatus.checking ? 'WAKING' : 'OFFLINE')}</span>
-            <RefreshCw className={`w-2.5 h-2.5 shrink-0 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#666]'}`} />
-          </button>
-
-          {/* Mobile Hamburger Toggle Button */}
-          <button
-            onClick={() => setMobileMenuOpen(prev => !prev)}
-            className="md:hidden p-1.5 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] hover:border-[#CCFF00] text-white transition-colors focus:outline-none shrink-0"
-            aria-label="Toggle navigation menu"
-          >
-            {mobileMenuOpen ? (
-              <X className="w-5 h-5 text-[#CCFF00]" />
-            ) : (
-              <Menu className="w-5 h-5 text-white" />
-            )}
-          </button>
         </div>
-      </div>
+      </nav>
 
-      {/* Mobile Dropdown Drawer */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-black/98 border-b border-[#222] px-4 py-4 space-y-2 animate-in slide-in-from-top-2 duration-200 shadow-2xl backdrop-blur-md">
-          <div className="text-[9px] font-mono text-[#666] uppercase tracking-widest border-b border-[#181818] pb-1.5 mb-2 flex justify-between items-center">
-            <span>Navigation Menu</span>
-            <span className="text-[#CCFF00]">VOCALGUARD v3.0</span>
-          </div>
+      {/* Slide-Over Cyber Drawer Menu */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end animate-in fade-in duration-200">
+          {/* Backdrop Blur */}
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          />
 
-          {/* Mobile Auth Drawer Segment */}
-          <div className="pb-2 border-b border-[#181818] mb-2">
-            {auth?.isConfigured ? (
-              auth.isSignedIn ? (
-                <div className="p-2.5 bg-[#0a0a0a] border border-[#222] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {auth.UserButton && <auth.UserButton afterSignOutUrl="/" />}
-                    <div className="font-mono truncate">
-                      <div className="text-xs text-white font-bold truncate">{auth.user.name}</div>
-                      <div className="text-[10px] text-[#888] truncate">{auth.user.email}</div>
+          {/* Drawer Panel */}
+          <div className="relative w-full max-w-md bg-[#080808] border-l border-[#222] p-5 sm:p-6 text-white font-mono flex flex-col justify-between overflow-y-auto z-10 shadow-[0_0_50px_rgba(0,0,0,0.85)] animate-in slide-in-from-right duration-300">
+            <div>
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-4 mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 bg-[#CCFF00] flex items-center justify-center shrink-0">
+                    <div className="w-1.5 h-1.5 bg-black" />
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase tracking-widest text-[#CCFF00]">// SYSTEM DIRECTORY</div>
+                    <div className="text-xs font-bold text-white uppercase">VocalGuard v3.0 Enclave</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDrawerOpen(false)}
+                  className="p-1.5 border border-[#333] hover:border-[#CCFF00] text-[#888] hover:text-white bg-[#111] transition-colors"
+                  aria-label="Close menu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Navigation Modules */}
+              <div className="space-y-2 mb-5">
+                <div className="text-[9px] text-[#666] uppercase tracking-widest mb-1.5">// Navigation Modules</div>
+                
+                <button
+                  onClick={() => navigateTo('landing')}
+                  className={`w-full flex items-center justify-between p-3 border text-left transition-all ${
+                    activeView === 'landing'
+                      ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
+                      : 'bg-[#0e0e0e] border-[#1e1e1e] text-[#ccc] hover:border-[#444] hover:text-white'
+                  }`}
+                >
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider">// 01 PLATFORM OVERVIEW</div>
+                    <div className="text-[10px] text-[#777] font-normal normal-case mt-0.5">Real-time voice deepfake protection</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-[#666]" />
+                </button>
+
+                <button
+                  onClick={() => navigateTo('technology')}
+                  className={`w-full flex items-center justify-between p-3 border text-left transition-all ${
+                    activeView === 'technology'
+                      ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
+                      : 'bg-[#0e0e0e] border-[#1e1e1e] text-[#ccc] hover:border-[#444] hover:text-white'
+                  }`}
+                >
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider">// 02 ARCHITECTURE</div>
+                    <div className="text-[10px] text-[#777] font-normal normal-case mt-0.5">Multi-Res STFT & SE-ResNet Deep Learning</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-[#666]" />
+                </button>
+
+                <button
+                  onClick={() => navigateTo('about')}
+                  className={`w-full flex items-center justify-between p-3 border text-left transition-all ${
+                    activeView === 'about'
+                      ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
+                      : 'bg-[#0e0e0e] border-[#1e1e1e] text-[#ccc] hover:border-[#444] hover:text-white'
+                  }`}
+                >
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider">// 03 ABOUT & BUILDERS</div>
+                    <div className="text-[10px] text-[#777] font-normal normal-case mt-0.5">Bimbok Mukherjee, Aditya Paul & Bijan Murmu</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-[#666]" />
+                </button>
+
+                <button
+                  onClick={() => navigateTo('dashboard')}
+                  className={`w-full flex items-center justify-between p-3 border text-left transition-all mt-2 ${
+                    activeView === 'dashboard'
+                      ? 'bg-[#CCFF00] text-black border-[#CCFF00] font-bold shadow-[0_0_15px_rgba(204,255,0,0.3)]'
+                      : 'bg-[#121212] border-[#2a2a2a] text-white hover:border-[#CCFF00]'
+                  }`}
+                >
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                      <span>// 04 OPERATIONS CONSOLE</span>
+                      <Radio className="w-3.5 h-3.5 text-current animate-pulse" />
+                    </div>
+                    <div className={`text-[10px] font-normal normal-case mt-0.5 ${activeView === 'dashboard' ? 'text-black/80' : 'text-[#888]'}`}>
+                      Live dual-factor forensics & biometric verification
                     </div>
                   </div>
-                  <span className="text-[8px] font-mono text-[#CCFF00] border border-[#CCFF00]/40 px-1.5 py-0.5 uppercase shrink-0">AUTH</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {auth.SignInButton && (
-                    <auth.SignInButton mode="modal">
-                      <button 
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="w-full py-2 font-mono text-xs uppercase tracking-wider border border-[#333] hover:border-[#CCFF00] text-white bg-[#111] text-center"
-                      >
-                        Sign In
-                      </button>
-                    </auth.SignInButton>
-                  )}
-                  {auth.SignUpButton && (
-                    <auth.SignUpButton mode="modal">
-                      <button 
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="w-full py-2 font-mono text-xs uppercase tracking-wider bg-[#CCFF00] text-black font-bold text-center"
-                      >
-                        Register
-                      </button>
-                    </auth.SignUpButton>
-                  )}
-                </div>
-              )
-            ) : (
-              <div className="p-2 bg-[#0e0e0e] border border-[#222] font-mono text-[10px] text-[#777] flex items-center justify-between">
-                <span>OPERATOR: GUEST MODE</span>
-                <span className="text-[#555]">DEMO</span>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-current" />
+                </button>
               </div>
-            )}
-          </div>
 
-          <button
-            onClick={() => {
-              setActiveView('landing');
-              setMobileMenuOpen(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className={`w-full flex items-center justify-between p-2.5 font-mono text-xs uppercase tracking-wider text-left border transition-all ${
-              activeView === 'landing'
-                ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
-                : 'bg-[#0a0a0a] border-[#1e1e1e] text-[#aaa] hover:text-white'
-            }`}
-          >
-            <div>
-              <div className="font-bold">// 01 PLATFORM</div>
-              <div className="text-[10px] text-[#666] normal-case">Forensic deepfake detection overview</div>
-            </div>
-            <ArrowRight className="w-4 h-4 text-[#555]" />
-          </button>
+              {/* Neural Model Telemetry Card */}
+              <div className="p-3.5 bg-[#0c0c0c] border border-[#1e1e1e] mb-4 space-y-2">
+                <div className="text-[9px] text-[#CCFF00] uppercase tracking-widest flex items-center justify-between">
+                  <span>// ACTIVE NEURAL MODEL</span>
+                  <span className="text-white">v3.0</span>
+                </div>
+                <div className="text-xs text-white font-bold">MULTI-RESOLUTION SE-RESNET</div>
+                <div className="grid grid-cols-2 gap-2 text-[10px] pt-1 border-t border-[#181818]">
+                  <div>
+                    <span className="text-[#666]">Accuracy:</span> <span className="text-[#CCFF00] font-bold ml-1">93.66%</span>
+                  </div>
+                  <div>
+                    <span className="text-[#666]">ROC-AUC:</span> <span className="text-white font-bold ml-1">98.71%</span>
+                  </div>
+                  <div>
+                    <span className="text-[#666]">Threshold:</span> <span className="text-amber-400 font-bold ml-1">τ* = 0.0509</span>
+                  </div>
+                  <div>
+                    <span className="text-[#666]">Embedding:</span> <span className="text-[#00E5FF] font-bold ml-1">128-D Cosine</span>
+                  </div>
+                </div>
+              </div>
 
-          <button
-            onClick={() => {
-              setActiveView('technology');
-              setMobileMenuOpen(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className={`w-full flex items-center justify-between p-2.5 font-mono text-xs uppercase tracking-wider text-left border transition-all ${
-              activeView === 'technology'
-                ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
-                : 'bg-[#0a0a0a] border-[#1e1e1e] text-[#aaa] hover:text-white'
-            }`}
-          >
-            <div>
-              <div className="font-bold">// 02 ARCHITECTURE</div>
-              <div className="text-[10px] text-[#666] normal-case">Multi-Res STFT & Anisotropic SE-ResNet v3</div>
-            </div>
-            <ArrowRight className="w-4 h-4 text-[#555]" />
-          </button>
+              {/* API Gateway & Server Ping Control */}
+              <div className="p-3.5 bg-[#0c0c0c] border border-[#1e1e1e] mb-4 space-y-2.5">
+                <div className="text-[9px] text-[#888] uppercase tracking-widest flex items-center justify-between">
+                  <span>// API GATEWAY TELEMETRY</span>
+                  <span className={`flex items-center gap-1 font-bold ${backendStatus.online ? 'text-[#CCFF00]' : 'text-[#FF3333]'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${backendStatus.online ? 'bg-[#CCFF00] animate-pulse' : 'bg-[#FF3333]'}`} />
+                    {backendStatus.online ? (backendStatus.latencyMs ? `${backendStatus.latencyMs}ms` : 'ONLINE') : 'OFFLINE'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-[10px] text-[#777]">
+                  <span>Render Cloud Instance:</span>
+                  <span className="text-white font-medium">{backendStatus.online ? 'Healthy & Connected' : (backendStatus.checking ? 'Pinging Gateway...' : 'Instance Suspended')}</span>
+                </div>
+                <button
+                  onClick={onRetryBackend}
+                  disabled={backendStatus.checking}
+                  className="w-full py-2 bg-[#141414] hover:bg-[#1f1f1f] border border-[#333] hover:border-[#CCFF00] text-xs text-white uppercase tracking-wider flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${backendStatus.checking ? 'animate-spin text-[#CCFF00]' : 'text-[#888]'}`} />
+                  <span>{backendStatus.checking ? 'Pinging Gateway...' : 'Ping Server / Wake Instance'}</span>
+                </button>
+              </div>
 
-          <button
-            onClick={() => {
-              setActiveView('about');
-              setMobileMenuOpen(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className={`w-full flex items-center justify-between p-2.5 font-mono text-xs uppercase tracking-wider text-left border transition-all ${
-              activeView === 'about'
-                ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-[#CCFF00]'
-                : 'bg-[#0a0a0a] border-[#1e1e1e] text-[#aaa] hover:text-white'
-            }`}
-          >
-            <div>
-              <div className="font-bold">// 03 ABOUT TEAM</div>
-              <div className="text-[10px] text-[#666] normal-case">Bimbok, Aditya & Bijan (SIH PS 26104)</div>
-            </div>
-            <ArrowRight className="w-4 h-4 text-[#555]" />
-          </button>
+              {/* Operator Authentication Segment */}
+              <div className="p-3.5 bg-[#0c0c0c] border border-[#1e1e1e]">
+                <div className="text-[9px] text-[#888] uppercase tracking-widest mb-2 flex items-center justify-between">
+                  <span>// OPERATOR ENCLAVE</span>
+                  <span className="text-[#CCFF00]">{auth?.isSignedIn ? 'SECURED' : 'UNAUTHENTICATED'}</span>
+                </div>
 
-          <button
-            onClick={() => {
-              setActiveView('dashboard');
-              setMobileMenuOpen(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="w-full flex items-center justify-between p-3 font-mono text-xs uppercase tracking-wider text-left bg-[#CCFF00] text-black font-bold border border-[#CCFF00] hover:bg-white transition-all shadow-[0_0_12px_rgba(204,255,0,0.25)] mt-1"
-          >
-            <div>
-              <div>// 04 OPERATIONS CONSOLE</div>
-              <div className="text-[10px] text-black/80 font-normal normal-case">Launch live deepfake analysis engine</div>
+                {auth?.isConfigured ? (
+                  auth.isSignedIn ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-xs text-white font-bold truncate">{auth.user.name}</div>
+                          <div className="text-[10px] text-[#777] truncate">{auth.user.email}</div>
+                        </div>
+                        {auth.UserButton && <auth.UserButton afterSignOutUrl="/" />}
+                      </div>
+                      <div className="text-[10px] text-[#888] pt-2 border-t border-[#181818] flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#CCFF00]" />
+                        <span>Clerk JWT Verified · Isolated Biometric Vault</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-[10px] text-[#777]">
+                        Authenticate to access the live operations console and private voiceprint vault.
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        {auth.SignInButton && (
+                          <auth.SignInButton mode="modal">
+                            <button 
+                              onClick={() => setDrawerOpen(false)}
+                              className="w-full py-2 bg-[#141414] hover:bg-[#222] border border-[#333] hover:border-[#CCFF00] text-xs uppercase tracking-wider text-white text-center transition-colors"
+                            >
+                              Sign In
+                            </button>
+                          </auth.SignInButton>
+                        )}
+                        {auth.SignUpButton && (
+                          <auth.SignUpButton mode="modal">
+                            <button 
+                              onClick={() => setDrawerOpen(false)}
+                              className="w-full py-2 bg-[#CCFF00] hover:bg-white text-black font-bold text-xs uppercase tracking-wider text-center transition-colors"
+                            >
+                              Register
+                            </button>
+                          </auth.SignUpButton>
+                        )}
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-[10px] text-[#666]">Running in local guest development mode.</div>
+                )}
+              </div>
             </div>
-            <ArrowRight className="w-4 h-4 text-black" />
-          </button>
 
-          <div className="pt-2 border-t border-[#181818] flex items-center justify-between text-[10px] font-mono text-[#777] mt-3">
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${backendStatus.online ? 'bg-[#CCFF00] animate-pulse' : 'bg-red-500'}`} />
-              <span>{backendStatus.online ? `API ONLINE (${backendStatus.latencyMs || 35}ms)` : 'API ASLEEP'}</span>
+            {/* Drawer Bottom Footnote */}
+            <div className="pt-5 border-t border-[#1a1a1a] mt-5 text-[9px] text-[#555] flex items-center justify-between">
+              <span>SIH PS 26104</span>
+              <span>VOCALGUARD ARCHITECTURE</span>
             </div>
-            <button
-              onClick={() => onRetryBackend()}
-              disabled={backendStatus.checking}
-              className="text-[#CCFF00] hover:underline uppercase flex items-center gap-1 border border-[#333] px-2 py-0.5 bg-[#111]"
-            >
-              <RefreshCw className={`w-2.5 h-2.5 ${backendStatus.checking ? 'animate-spin' : ''}`} />
-              <span>{backendStatus.checking ? 'Pinging...' : 'Ping Server'}</span>
-            </button>
           </div>
         </div>
       )}
-    </nav>
-  );
-}
-
-function NavLink({ label, active, onClick, isAccent }) {
-  if (isAccent) {
-    return (
-      <button 
-        onClick={onClick}
-        className="font-mono text-xs tracking-widest uppercase text-black bg-[#CCFF00] px-4 py-2 hover:bg-white transition-colors"
-      >
-        [ {label} ]
-      </button>
-    );
-  }
-  return (
-    <button 
-      onClick={onClick} 
-      className={`font-mono text-xs tracking-widest uppercase transition-colors ${
-        active ? 'text-white' : 'text-[#888888] hover:text-white'
-      }`}
-    >
-      {label}
-    </button>
+    </>
   );
 }
 
