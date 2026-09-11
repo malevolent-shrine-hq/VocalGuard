@@ -1,13 +1,22 @@
+# Core Deep Learning & PyTorch Audio
 torch>=2.0.0
 torchaudio>=2.0.0
+
+# Signal Processing & Audio I/O
 soundfile>=0.12.1
 scipy>=1.10.0
 numpy>=1.24.0
+
+# FastAPI Server & Real-time WebSockets
 fastapi>=0.100.0
 uvicorn>=0.20.0
 websockets>=12.0
 python-multipart>=0.0.6
 pydantic>=2.0.0
 python-dotenv>=1.0.0
+
+# Clerk Authentication & Cryptographic JWKS Verification
 httpx>=0.25.0
 pyjwt[crypto]>=2.8.0
+cryptography>=41.0.0
+
