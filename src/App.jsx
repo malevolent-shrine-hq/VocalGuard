@@ -381,27 +381,6 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend, auth
 
           {/* Right Section: Clean Nav Links + Console CTA + Auth + Hamburger */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Minimalist Desktop Text Links (Visible on large screens) */}
-            <div className="hidden lg:flex items-center gap-5 font-mono text-xs uppercase tracking-wider">
-              <button
-                onClick={() => navigateTo('landing')}
-                className={`transition-colors py-1 ${activeView === 'landing' ? 'text-[#CCFF00] font-bold' : 'text-[#888] hover:text-white'}`}
-              >
-                Platform
-              </button>
-              <button
-                onClick={() => navigateTo('technology')}
-                className={`transition-colors py-1 ${activeView === 'technology' ? 'text-[#CCFF00] font-bold' : 'text-[#888] hover:text-white'}`}
-              >
-                Architecture
-              </button>
-              <button
-                onClick={() => navigateTo('about')}
-                className={`transition-colors py-1 ${activeView === 'about' ? 'text-[#CCFF00] font-bold' : 'text-[#888] hover:text-white'}`}
-              >
-                About
-              </button>
-            </div>
 
             {/* Sleek Console Action Button (Guaranteed No Wrapping) */}
             <button
