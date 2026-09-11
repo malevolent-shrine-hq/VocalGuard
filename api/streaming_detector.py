@@ -109,6 +109,8 @@ class StreamingSession:
         # Target enrolled executive for speaker verification (defaults to seeded demo CXO)
         self.target_speaker_id: Optional[str] = "cxo_vikram_sharma"
         self.audio_format: str = "pcm_s16le"
+        self.user_id: Optional[str] = None
+        self.user_email: Optional[str] = None
 
         logger.info(f"[STREAM:{self.session_id}] Session initialized (τ={self.threshold:.4f}, α={self.ema_alpha})")
 
@@ -375,6 +377,7 @@ class StreamingSession:
             "chunks_received": self.chunks_received,
             "buffered_seconds": round(self.buffer_len / SAMPLE_RATE, 3),
             "model_version": "SE-ResNet-v3 (93.66% Acc)",
+            "user_id": self.user_id,
             "biometrics": bio_result,
             "composite_verdict": composite_verdict,
             "composite_risk": composite_risk,
@@ -387,7 +390,7 @@ class StreamingSession:
             self.prediction_history.pop(0)
 
         logger.info(
-            f"[STREAM:{self.session_id}] t={stream_duration_sec:5.1f}s | "
+            f"[STREAM:{self.session_id}|{self.user_id or 'guest'}] t={stream_duration_sec:5.1f}s | "
             f"Raw: {raw_fake_prob*100:5.1f}% | EMA: {self.smoothed_fake_prob*100:5.1f}% | "
             f"BioMatch: {bio_result.get('identity_match_percentage', 0):.1f}% | "
             f"Verdict: {composite_verdict:<26} | Latency: {inference_latency:4.1f}ms"

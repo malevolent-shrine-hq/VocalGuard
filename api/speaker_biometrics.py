@@ -77,28 +77,42 @@ class SpeakerBiometricsEngine:
 
         return vec
 
-    def enroll_speaker(self, speaker_id: str, name: str, role: str, 
-                       audio: np.ndarray, authorized_limit: str = "₹ 50,00,000") -> Dict[str, Any]:
-        """Enrolls an executive's voiceprint into the biometric vault."""
+    def enroll_speaker(
+        self,
+        speaker_id: str,
+        name: str,
+        role: str,
+        audio: np.ndarray,
+        authorized_limit: str = "₹ 50,00,000",
+        user_id: Optional[str] = None,
+        user_email: Optional[str] = None,
+        is_own_profile: bool = False
+    ) -> Dict[str, Any]:
+        """Enrolls an executive's voiceprint into the biometric vault, tagged with user ownership."""
         voiceprint = self.extract_voiceprint(audio)
         profile = {
             "speaker_id": speaker_id,
+            "user_id": user_id or "system",
+            "user_email": user_email,
             "name": name,
             "role": role,
             "authorized_limit": authorized_limit,
+            "is_own_profile": is_own_profile,
             "voiceprint": voiceprint.tolist(),
             "enrolled_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "duration_sec": round(len(audio) / 16000, 2)
         }
         self.enrolled_speakers[speaker_id] = profile
         self._save_vault()
-        logger.info(f"Enrolled speaker voiceprint: {name} (ID: {speaker_id})")
+        logger.info(f"Enrolled speaker voiceprint: {name} (ID: {speaker_id}, User: {user_id or 'system'}, Own: {is_own_profile})")
         return {
             "status": "success",
             "speaker_id": speaker_id,
+            "user_id": user_id or "system",
             "name": name,
             "role": role,
             "authorized_limit": authorized_limit,
+            "is_own_profile": is_own_profile,
             "message": f"Successfully enrolled voiceprint for {name}"
         }
 
@@ -153,25 +167,52 @@ class SpeakerBiometricsEngine:
             "verdict": verdict
         }
 
-    def list_profiles(self) -> List[Dict[str, Any]]:
-        return [
-            {
-                "speaker_id": p["speaker_id"],
-                "name": p["name"],
-                "role": p["role"],
+    def list_profiles(self, current_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lists enrolled profiles with user ownership tags."""
+        result = []
+        for speaker_id, p in self.enrolled_speakers.items():
+            profile_user_id = p.get("user_id")
+            is_system = bool(not profile_user_id or profile_user_id == "system" or speaker_id.startswith("cxo_"))
+            is_own = bool(p.get("is_own_profile", False) and current_user_id and profile_user_id == current_user_id)
+            is_owner = bool(current_user_id and profile_user_id == current_user_id and not is_system)
+
+            result.append({
+                "speaker_id": speaker_id,
+                "user_id": profile_user_id,
+                "name": p.get("name", speaker_id),
+                "role": p.get("role", "Executive"),
                 "authorized_limit": p.get("authorized_limit", "₹ 50,00,000"),
                 "enrolled_at": p.get("enrolled_at", "Pre-enrolled"),
-                "duration_sec": p.get("duration_sec", 4.0)
-            }
-            for p in self.enrolled_speakers.values()
-        ]
+                "duration_sec": p.get("duration_sec", 4.0),
+                "is_owner": is_owner,
+                "is_system": is_system,
+                "is_own_profile": is_own
+            })
+        return result
 
-    def delete_profile(self, speaker_id: str) -> bool:
-        if speaker_id in self.enrolled_speakers:
-            del self.enrolled_speakers[speaker_id]
-            self._save_vault()
-            return True
-        return False
+    def delete_profile(self, speaker_id: str, current_user_id: Optional[str] = None) -> bool:
+        """Deletes a profile if owned by the current user."""
+        if speaker_id not in self.enrolled_speakers:
+            return False
+        profile = self.enrolled_speakers[speaker_id]
+        profile_user_id = profile.get("user_id")
+        is_system = not profile_user_id or profile_user_id == "system" or speaker_id.startswith("cxo_")
+        if is_system:
+            raise PermissionError("Protected System profile: Cannot delete organization default executive profile.")
+
+        if current_user_id and profile_user_id != current_user_id:
+            raise PermissionError("Unauthorized: You can only delete your own enrolled voiceprint profiles.")
+
+        del self.enrolled_speakers[speaker_id]
+        self._save_vault()
+        return True
+
+    def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Finds the personal voiceprint profile for a given Clerk user ID."""
+        for p in self.enrolled_speakers.values():
+            if p.get("user_id") == user_id and p.get("is_own_profile"):
+                return p
+        return None
 
     def _save_vault(self):
         if not self.storage_path:

@@ -14,12 +14,14 @@ from typing import Optional
 
 from dotenv import load_dotenv
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 # Load environment variables from .env file if present
 load_dotenv()
+
+from api.auth import AuthenticatedUser, get_current_user, verify_clerk_token
 
 from api.detector import DetectorManager
 from api.streaming_detector import SAMPLE_RATE, streaming_controller
@@ -113,8 +115,9 @@ async def detect_audio(
 
 
 @app.websocket("/ws/detect")
-async def detect_live_audio(websocket: WebSocket):
-    """Process one isolated 16 kHz mono PCM microphone stream in memory.
+async def websocket_detect(websocket: WebSocket, token: Optional[str] = None):
+    """
+    Real-time rolling-window deepfake detector over WebSocket.
 
     Protocol: client sends a JSON `start` frame declaring `pcm_s16le`, then
     binary little-endian int16 mono PCM frames. Server frames are JSON status,
@@ -127,11 +130,23 @@ async def detect_live_audio(websocket: WebSocket):
     await websocket.accept()
     session = streaming_controller.create_session()
     started = False
+
+    # Check for authentication token in query params
+    if token:
+        try:
+            auth_user = verify_clerk_token(token)
+            session.user_id = auth_user.id
+            session.user_email = auth_user.email
+            logger.info(f"[STREAM:{session.session_id}] Authenticated session for user {auth_user.id}")
+        except Exception as e:
+            logger.warning(f"WebSocket query token auth error: {e}")
+
     logger.info("[STREAM:%s] WebSocket connected", session.session_id)
     try:
         await websocket.send_json({
             "type": "status",
             "session_id": session.session_id,
+            "user_id": session.user_id,
             "state": "LISTENING",
             "sample_rate": SAMPLE_RATE,
             "window_seconds": 2.0,
@@ -158,8 +173,40 @@ async def detect_live_audio(websocket: WebSocket):
                         await websocket.send_json({"type": "error", "code": "UNSUPPORTED_FORMAT", "message": "Live detection requires 16 kHz PCM."})
                         continue
                     session.audio_format = fmt
+                    # Authenticate if token provided in start control frame
+                    if control.get("token"):
+                        try:
+                            auth_user = verify_clerk_token(control["token"])
+                            session.user_id = auth_user.id
+                            session.user_email = auth_user.email
+                            logger.info(f"[STREAM:{session.session_id}] Attached to user {auth_user.id} via start packet")
+                        except Exception as e:
+                            logger.warning(f"Start token verification failed: {e}")
                     started = True
-                    await websocket.send_json({"type": "status", "session_id": session.session_id, "state": "BUFFERING", "buffered_seconds": 0.0, "target_seconds": 2.0})
+                    await websocket.send_json({
+                        "type": "status",
+                        "session_id": session.session_id,
+                        "user_id": session.user_id,
+                        "state": "BUFFERING",
+                        "buffered_seconds": 0.0,
+                        "target_seconds": 2.0
+                    })
+                elif action == "authenticate":
+                    auth_token = control.get("token")
+                    if auth_token:
+                        try:
+                            auth_user = verify_clerk_token(auth_token)
+                            session.user_id = auth_user.id
+                            session.user_email = auth_user.email
+                            await websocket.send_json({
+                                "type": "authenticated",
+                                "session_id": session.session_id,
+                                "user_id": auth_user.id,
+                                "name": auth_user.name
+                            })
+                        except Exception as e:
+                            await websocket.send_json({"type": "error", "code": "AUTH_FAILED", "message": str(e)})
+                    continue
                 elif action == "stop":
                     await websocket.send_json({"type": "status", "session_id": session.session_id, "state": "STOPPED"})
                     break
@@ -249,13 +296,44 @@ def get_sample_file(filename: str):
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
 # ============================================================
+# CLERK AUTHENTICATION & USER SESSION API
+# ============================================================
+@app.get("/api/auth/me")
+def get_current_user_profile(user: AuthenticatedUser = Depends(get_current_user)):
+    """Returns active Clerk session info and personal voiceprint status."""
+    from api.speaker_biometrics import biometrics_engine
+    own_profile = biometrics_engine.get_user_profile(user.id) if user.is_authenticated else None
+    return {
+        "authenticated": user.is_authenticated,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "is_authenticated": user.is_authenticated
+        } if user.is_authenticated else None,
+        "has_enrolled_voiceprint": bool(own_profile is not None),
+        "own_profile": {
+            "speaker_id": own_profile["speaker_id"],
+            "name": own_profile["name"],
+            "role": own_profile["role"],
+            "authorized_limit": own_profile["authorized_limit"],
+            "enrolled_at": own_profile["enrolled_at"]
+        } if own_profile else None
+    }
+
+
+# ============================================================
 # SPEAKER BIOMETRICS & VOICEPRINT ENROLLMENT API
 # ============================================================
 @app.get("/api/biometrics/profiles")
-def get_biometric_profiles():
-    """Returns list of enrolled VIP/CXO voiceprint profiles."""
+def get_biometric_profiles(user: AuthenticatedUser = Depends(get_current_user)):
+    """Returns list of enrolled VIP/CXO and user voiceprint profiles."""
     from api.speaker_biometrics import biometrics_engine
-    return {"profiles": biometrics_engine.list_profiles()}
+    return {
+        "profiles": biometrics_engine.list_profiles(current_user_id=user.id),
+        "current_user_id": user.id,
+        "is_authenticated": user.is_authenticated
+    }
 
 
 @app.post("/api/biometrics/enroll")
@@ -264,26 +342,47 @@ async def enroll_biometric_profile(
     name: str = Form(...),
     role: str = Form("Executive"),
     authorized_limit: str = Form("₹ 50,00,000"),
-    file: UploadFile = File(...)
+    is_own_profile: bool = Form(False),
+    file: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(get_current_user)
 ):
-    """Enrolls an executive's voice into the vault from an uploaded audio file or recording."""
+    """Enrolls a voice into the vault, tagged with current Clerk user ownership."""
     from api.speaker_biometrics import biometrics_engine
     from api.detector import load_audio_from_bytes_or_path
     import re
-    if not speaker_id or not speaker_id.strip():
-        clean_name = re.sub(r'[^a-zA-Z0-9]+', '_', name.lower()).strip('_')
+
+    clean_name = re.sub(r'[^a-zA-Z0-9]+', '_', name.lower()).strip('_')
+    if is_own_profile and user.is_authenticated:
+        speaker_id = f"user_{user.id}"
+    elif not speaker_id or not speaker_id.strip():
         speaker_id = f"cxo_{clean_name}"
+
     audio_bytes = await file.read()
     audio, _, _ = load_audio_from_bytes_or_path(audio_bytes, file.filename)
-    result = biometrics_engine.enroll_speaker(speaker_id, name, role, audio, authorized_limit)
+    result = biometrics_engine.enroll_speaker(
+        speaker_id=speaker_id,
+        name=name,
+        role=role,
+        audio=audio,
+        authorized_limit=authorized_limit,
+        user_id=user.id if user.is_authenticated else None,
+        user_email=user.email,
+        is_own_profile=is_own_profile
+    )
     return result
 
 
 @app.delete("/api/biometrics/profiles/{speaker_id}")
-def delete_biometric_profile(speaker_id: str):
-    """Deletes an enrolled voiceprint profile."""
+def delete_biometric_profile(
+    speaker_id: str,
+    user: AuthenticatedUser = Depends(get_current_user)
+):
+    """Deletes an enrolled voiceprint profile with ownership verification."""
     from api.speaker_biometrics import biometrics_engine
-    success = biometrics_engine.delete_profile(speaker_id)
+    try:
+        success = biometrics_engine.delete_profile(speaker_id, current_user_id=user.id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not success:
         raise HTTPException(status_code=404, detail="Profile not found")
     return {"status": "success", "message": f"Deleted profile {speaker_id}"}

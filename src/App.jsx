@@ -6,8 +6,10 @@ import {
   Download, AlertOctagon, Radio,
   Terminal, FileAudio, ChevronDown, ChevronUp, Loader2,
   ArrowUpRight, Shield, Code2, Menu, X,
-  Fingerprint, UserCheck, UserX, UserPlus, ShieldAlert, ShieldCheck, Trash2
+  Fingerprint, UserCheck, UserX, UserPlus, ShieldAlert, ShieldCheck, Trash2,
+  Lock, User
 } from 'lucide-react';
+import { useUser, useAuth, UserButton, SignInButton, SignUpButton } from '@clerk/clerk-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const MAX_LIVE_HISTORY = 120;
@@ -34,7 +36,67 @@ function resampleTo16k(samples, sourceRate) {
   return output;
 }
 
-export default function App() {
+function ClerkAuthConsumer({ children }) {
+  const { user, isSignedIn, isLoaded } = useUser();
+  const { getToken, signOut } = useAuth();
+
+  const auth = {
+    isConfigured: true,
+    isLoaded,
+    isSignedIn: !!isSignedIn,
+    user: user
+      ? {
+          id: user.id,
+          name: user.fullName || user.firstName || user.username || user.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Operator',
+          email: user.primaryEmailAddress?.emailAddress || '',
+          imageUrl: user.imageUrl,
+        }
+      : null,
+    getToken: async () => {
+      try {
+        return await getToken();
+      } catch (e) {
+        console.warn('Clerk getToken error:', e);
+        return null;
+      }
+    },
+    signOut,
+    UserButton,
+    SignInButton,
+    SignUpButton,
+  };
+
+  return children(auth);
+}
+
+function ClerkAuthBridge({ isClerkConfigured, children }) {
+  if (!isClerkConfigured) {
+    const guestAuth = {
+      isConfigured: false,
+      isLoaded: true,
+      isSignedIn: false,
+      user: null,
+      getToken: async () => null,
+      signOut: async () => {},
+      UserButton: null,
+      SignInButton: null,
+      SignUpButton: null,
+    };
+    return children(guestAuth);
+  }
+
+  return <ClerkAuthConsumer>{children}</ClerkAuthConsumer>;
+}
+
+export default function App({ isClerkConfigured = false }) {
+  return (
+    <ClerkAuthBridge isClerkConfigured={isClerkConfigured}>
+      {(auth) => <AppContent auth={auth} />}
+    </ClerkAuthBridge>
+  );
+}
+
+function AppContent({ auth }) {
   const [activeView, setActiveView] = useState('dashboard');
   const [backendStatus, setBackendStatus] = useState({ 
     online: false, 
@@ -117,11 +179,12 @@ export default function App() {
         setActiveView={setActiveView} 
         backendStatus={backendStatus} 
         onRetryBackend={handleManualRetry}
+        auth={auth}
       />
       
       <main className="pt-20 sm:pt-24 pb-16 sm:pb-20 px-3 sm:px-6 max-w-7xl mx-auto relative z-10 w-full overflow-x-hidden flex-1">
         {activeView === 'landing' && <LandingPage setActiveView={setActiveView} />}
-        {activeView === 'dashboard' && <LiveDashboard backendStatus={backendStatus} onRetryBackend={handleManualRetry} />}
+        {activeView === 'dashboard' && <LiveDashboard backendStatus={backendStatus} onRetryBackend={handleManualRetry} auth={auth} />}
         {activeView === 'technology' && <TechnologyPage />}
         {activeView === 'about' && <AboutPage setActiveView={setActiveView} />}
       </main>
@@ -152,7 +215,7 @@ function TopoBackground() {
 /* =========================================
    NAVIGATION BAR
    ========================================= */
-function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
+function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend, auth }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -219,6 +282,44 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
             <NavLink label="Console" active={activeView === 'dashboard'} onClick={() => { setActiveView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} isAccent />
           </div>
 
+          {/* Clerk Auth Section (Desktop) */}
+          <div className="hidden md:flex items-center ml-2">
+            {auth?.isConfigured ? (
+              auth.isSignedIn ? (
+                <div className="flex items-center gap-2 pl-3 border-l border-[#222]">
+                  <div className="text-right hidden xl:block font-mono leading-none">
+                    <div className="text-[10px] text-white font-bold truncate max-w-[120px]">{auth.user.name}</div>
+                    <div className="text-[8px] text-[#CCFF00] uppercase tracking-widest mt-0.5">SECURED</div>
+                  </div>
+                  {auth.UserButton && <auth.UserButton afterSignOutUrl="/" />}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 pl-3 border-l border-[#222]">
+                  {auth.SignInButton && (
+                    <auth.SignInButton mode="modal">
+                      <button className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1.5 border border-[#333] hover:border-[#CCFF00] text-white hover:text-[#CCFF00] bg-[#111] transition-colors flex items-center gap-1.5">
+                        <User className="w-3 h-3 text-[#CCFF00]" />
+                        <span>Sign In</span>
+                      </button>
+                    </auth.SignInButton>
+                  )}
+                  {auth.SignUpButton && (
+                    <auth.SignUpButton mode="modal">
+                      <button className="hidden xl:flex font-mono text-[10px] uppercase tracking-wider px-2.5 py-1.5 bg-[#CCFF00] hover:bg-white text-black font-bold transition-colors">
+                        Register
+                      </button>
+                    </auth.SignUpButton>
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-[#0e0e0e] border border-[#222] text-[9px] font-mono text-[#777] ml-2" title="Clerk publishable key not provided in .env (running in guest mode)">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#555]" />
+                <span>GUEST MODE</span>
+              </div>
+            )}
+          </div>
+
           {/* Mobile Quick Status Pill */}
           <button
             onClick={onRetryBackend}
@@ -256,6 +357,52 @@ function Navbar({ activeView, setActiveView, backendStatus, onRetryBackend }) {
           <div className="text-[9px] font-mono text-[#666] uppercase tracking-widest border-b border-[#181818] pb-1.5 mb-2 flex justify-between items-center">
             <span>Navigation Menu</span>
             <span className="text-[#CCFF00]">VOCALGUARD v3.0</span>
+          </div>
+
+          {/* Mobile Auth Drawer Segment */}
+          <div className="pb-2 border-b border-[#181818] mb-2">
+            {auth?.isConfigured ? (
+              auth.isSignedIn ? (
+                <div className="p-2.5 bg-[#0a0a0a] border border-[#222] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {auth.UserButton && <auth.UserButton afterSignOutUrl="/" />}
+                    <div className="font-mono truncate">
+                      <div className="text-xs text-white font-bold truncate">{auth.user.name}</div>
+                      <div className="text-[10px] text-[#888] truncate">{auth.user.email}</div>
+                    </div>
+                  </div>
+                  <span className="text-[8px] font-mono text-[#CCFF00] border border-[#CCFF00]/40 px-1.5 py-0.5 uppercase shrink-0">AUTH</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {auth.SignInButton && (
+                    <auth.SignInButton mode="modal">
+                      <button 
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="w-full py-2 font-mono text-xs uppercase tracking-wider border border-[#333] hover:border-[#CCFF00] text-white bg-[#111] text-center"
+                      >
+                        Sign In
+                      </button>
+                    </auth.SignInButton>
+                  )}
+                  {auth.SignUpButton && (
+                    <auth.SignUpButton mode="modal">
+                      <button 
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="w-full py-2 font-mono text-xs uppercase tracking-wider bg-[#CCFF00] text-black font-bold text-center"
+                      >
+                        Register
+                      </button>
+                    </auth.SignUpButton>
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="p-2 bg-[#0e0e0e] border border-[#222] font-mono text-[10px] text-[#777] flex items-center justify-between">
+                <span>OPERATOR: GUEST MODE</span>
+                <span className="text-[#555]">DEMO</span>
+              </div>
+            )}
           </div>
 
           <button
@@ -710,7 +857,7 @@ function TelemetryTerminal({ logs, uploadProgress, uploadPhase, isAnalyzing, onA
 /* =========================================
    LIVE DASHBOARD (Full Backend Connected)
    ========================================= */
-function LiveDashboard({ backendStatus, onRetryBackend }) {
+function LiveDashboard({ backendStatus, onRetryBackend, auth }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [status, setStatus] = useState('idle'); // idle, analyzing, danger, safe, error
   const [fileName, setFileName] = useState(null);
@@ -739,11 +886,14 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
   const [enrolledProfiles, setEnrolledProfiles] = useState([]);
   const [selectedSpeakerId, setSelectedSpeakerId] = useState('cxo_vikram_sharma');
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [enrollAsOwnDefault, setEnrollAsOwnDefault] = useState(false);
   const selectedSpeakerIdRef = useRef(selectedSpeakerId);
 
   useEffect(() => {
     selectedSpeakerIdRef.current = selectedSpeakerId;
   }, [selectedSpeakerId]);
+
+  const myProfile = enrolledProfiles.find(p => p.is_own_profile || (auth?.user?.id && p.user_id === auth?.user?.id));
 
   const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -773,7 +923,9 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
 
   const fetchProfiles = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/biometrics/profiles`);
+      const token = auth?.getToken ? await auth.getToken() : null;
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/api/biometrics/profiles`, { headers });
       if (!res.ok) return;
       const data = await res.json();
       if (data && Array.isArray(data.profiles)) {
@@ -781,32 +933,24 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
         if (data.profiles.length > 0) {
           setSelectedSpeakerId(prev => {
             const exists = data.profiles.some(p => p.speaker_id === prev);
-            return exists ? prev : data.profiles[0].speaker_id;
+            if (exists) return prev;
+            const myProfile = data.profiles.find(p => p.is_own_profile);
+            return myProfile ? myProfile.speaker_id : data.profiles[0].speaker_id;
           });
         }
       }
     } catch (err) {
       console.warn('Could not fetch profiles:', err);
     }
-  }, []);
+  }, [auth]);
 
   useEffect(() => {
-    let isMounted = true;
-    fetch(`${API_BASE}/api/biometrics/profiles`)
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => {
-        if (!isMounted || !data || !Array.isArray(data.profiles)) return;
-        setEnrolledProfiles(data.profiles);
-        if (data.profiles.length > 0) {
-          setSelectedSpeakerId(prev => {
-            const exists = data.profiles.some(p => p.speaker_id === prev);
-            return exists ? prev : data.profiles[0].speaker_id;
-          });
-        }
-      })
-      .catch(() => {});
-    return () => { isMounted = false; };
-  }, []);
+    let isCurrent = true;
+    (async () => {
+      if (isCurrent) await fetchProfiles();
+    })();
+    return () => { isCurrent = false; };
+  }, [fetchProfiles, auth?.isSignedIn]);
 
   const handleSelectSpeaker = useCallback((speakerId) => {
     setSelectedSpeakerId(speakerId);
@@ -819,17 +963,30 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
   }, [addLog, enrolledProfiles]);
 
   const handleDeleteProfile = useCallback(async (speakerId) => {
-    if (!window.confirm(`Delete voiceprint profile "${speakerId}" from vault?`)) return;
+    const target = enrolledProfiles.find(p => p.speaker_id === speakerId);
+    const targetName = target ? target.name : speakerId;
+    if (!window.confirm(`Delete voiceprint profile "${targetName}" from vault?`)) return;
     try {
-      const res = await fetch(`${API_BASE}/api/biometrics/profiles/${speakerId}`, { method: 'DELETE' });
+      const token = auth?.getToken ? await auth.getToken() : null;
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/api/biometrics/profiles/${speakerId}`, { 
+        method: 'DELETE',
+        headers 
+      });
       if (res.ok) {
-        addLog('BIOMETRIC', `Deleted profile from vault: ${speakerId}`, 'warning');
+        addLog('BIOMETRIC', `Deleted profile from vault: ${targetName}`, 'warning');
         await fetchProfiles();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const msg = errData.detail || 'Failed to delete profile.';
+        alert(msg);
+        addLog('BIOMETRIC', `Delete failed: ${msg}`, 'danger');
       }
     } catch (err) {
       console.error('Delete profile error:', err);
+      alert('Delete error: ' + err.message);
     }
-  }, [addLog, fetchProfiles]);
+  }, [addLog, enrolledProfiles, fetchProfiles, auth]);
 
   const releaseLiveResources = useCallback(() => {
     if (liveTimerRef.current) clearInterval(liveTimerRef.current);
@@ -896,12 +1053,20 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       liveProcessorRef.current = processor;
       liveMuteRef.current = mute;
 
+      const token = auth?.getToken ? await auth.getToken() : null;
       const socket = new WebSocket(getLiveWebSocketUrl());
       socket.binaryType = 'arraybuffer';
       liveSocketRef.current = socket;
       socket.onopen = () => {
         if (liveStoppingRef.current) return;
-        socket.send(JSON.stringify({ type: 'start', format: 'pcm_s16le', sample_rate: 16000, channels: 1 }));
+        socket.send(JSON.stringify({ 
+          type: 'start', 
+          format: 'pcm_s16le', 
+          sample_rate: 16000, 
+          channels: 1,
+          token: token || undefined,
+          speaker_id: selectedSpeakerIdRef.current || undefined
+        }));
         if (selectedSpeakerIdRef.current) {
           socket.send(JSON.stringify({ type: 'set_speaker', speaker_id: selectedSpeakerIdRef.current }));
         }
@@ -959,7 +1124,7 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       setLivePhase('ERROR');
       setErrorMessage(err.name === 'NotAllowedError' ? 'Microphone permission denied.' : `Unable to start live detection: ${err.message}`);
     }
-  }, [addLog, isAnalyzing, isLiveDetecting, isRecording, releaseLiveResources]);
+  }, [addLog, isAnalyzing, isLiveDetecting, isRecording, releaseLiveResources, auth]);
 
   // Audio Playback Listener
   useEffect(() => {
@@ -1134,7 +1299,16 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
       };
 
       xhr.open('POST', `${API_BASE}/api/detect`);
-      xhr.send(formData);
+      if (auth?.getToken) {
+        auth.getToken().then(token => {
+          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.send(formData);
+        }).catch(() => {
+          xhr.send(formData);
+        });
+      } else {
+        xhr.send(formData);
+      }
     });
   };
 
@@ -1422,7 +1596,10 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <button
-              onClick={() => setIsEnrollModalOpen(true)}
+              onClick={() => {
+                setEnrollAsOwnDefault(false);
+                setIsEnrollModalOpen(true);
+              }}
               className="font-mono text-xs uppercase tracking-wider px-3 sm:px-3.5 py-2.5 bg-[#111] hover:bg-[#1a1a1a] text-white border border-[#333] hover:border-[#CCFF00] transition-colors flex items-center gap-2"
             >
               <UserPlus className="w-3.5 h-3.5 text-[#CCFF00]" />
@@ -1440,6 +1617,104 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           </div>
         </div>
 
+        {/* Personal Voiceprint Status Ribbon (Clerk Multi-User Aware) */}
+        {auth?.isConfigured && (
+          <div className="px-4 sm:px-5 py-2.5 bg-[#0a0f0a] border-b border-[#1c2918] flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+            {auth.isSignedIn ? (
+              myProfile ? (
+                <>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-1.5 bg-[#CCFF00]/10 border border-[#CCFF00]/40 text-[#CCFF00] shrink-0">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white font-bold truncate">Personal Voiceprint Active:</span>
+                        <span className="text-[#CCFF00] font-bold">{myProfile.name}</span>
+                        <span className="text-[9px] bg-[#1a2e12] text-[#8ce94b] border border-[#2d4f20] px-1.5 py-0.2 uppercase font-bold">128-D PROTECTED</span>
+                      </div>
+                      <div className="text-[10px] text-[#777] truncate">
+                        Bound to Clerk session ({auth.user?.email || auth.user?.name}) · Enrolled {myProfile.enrolled_at}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {selectedSpeakerId !== myProfile.speaker_id ? (
+                      <button
+                        onClick={() => handleSelectSpeaker(myProfile.speaker_id)}
+                        className="px-2.5 py-1 text-[10px] uppercase font-bold tracking-wider bg-[#CCFF00] text-black hover:bg-white transition-colors"
+                      >
+                        Target My Voice
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#CCFF00] border border-[#CCFF00]/40 px-2 py-0.5 bg-[#CCFF00]/10">
+                        ✓ Active Live Target
+                      </span>
+                    )}
+                    <button
+                      onClick={() => {
+                        setEnrollAsOwnDefault(true);
+                        setIsEnrollModalOpen(true);
+                      }}
+                      className="px-2 py-1 text-[10px] uppercase tracking-wider text-[#aaa] hover:text-white border border-[#333] hover:border-[#555] bg-[#111] transition-colors"
+                    >
+                      Re-enroll
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-1.5 bg-amber-500/10 border border-amber-500/40 text-amber-400 shrink-0">
+                      <ShieldAlert className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-white font-bold text-xs flex items-center gap-2">
+                        <span>Personal Voiceprint Not Enrolled</span>
+                        <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 uppercase font-bold">VULNERABLE</span>
+                      </div>
+                      <div className="text-[10px] text-[#888] truncate">
+                        Signed in as {auth.user?.name}. Enroll your genuine voice to protect yourself from impersonation.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEnrollAsOwnDefault(true);
+                      setIsEnrollModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#CCFF00] text-black hover:bg-white transition-colors flex items-center gap-1.5 shrink-0 shadow-[0_0_8px_rgba(204,255,0,0.2)]"
+                  >
+                    <Fingerprint className="w-3.5 h-3.5" />
+                    <span>Enroll My Voiceprint</span>
+                  </button>
+                </>
+              )
+            ) : (
+              <>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-1.5 bg-[#141414] border border-[#282828] text-[#888] shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-white font-bold text-xs">Clerk Multi-User Biometric Isolation Available</div>
+                    <div className="text-[10px] text-[#777] truncate">
+                      Sign in to enroll your private personal voiceprint and isolate biometrics to your user session.
+                    </div>
+                  </div>
+                </div>
+                {auth.SignInButton ? (
+                  <auth.SignInButton mode="modal">
+                    <button className="px-3 py-1.5 text-xs font-mono uppercase tracking-wider border border-[#CCFF00] text-[#CCFF00] hover:bg-[#CCFF00] hover:text-black transition-colors shrink-0">
+                      Sign In to Enroll
+                    </button>
+                  </auth.SignInButton>
+                ) : null}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Target CXO Selector Ribbon */}
         <div className="px-4 sm:px-5 py-2.5 bg-[#080808] border-b border-[#1a1a1a] flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono text-xs">
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1451,11 +1726,15 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
               onChange={(e) => handleSelectSpeaker(e.target.value)}
               className="bg-[#111] text-white border border-[#333] px-2.5 py-1 text-xs focus:border-[#CCFF00] focus:outline-none max-w-xs sm:max-w-md truncate"
             >
-              {enrolledProfiles.map((p) => (
-                <option key={p.speaker_id} value={p.speaker_id}>
-                  {p.name} — {p.role} ({p.authorized_limit})
-                </option>
-              ))}
+              {enrolledProfiles.map((p) => {
+                const isMine = p.is_own_profile || (auth?.user?.id && p.user_id === auth?.user?.id);
+                return (
+                  <option key={p.speaker_id} value={p.speaker_id}>
+                    {isMine ? '⭐ [MY PROFILE] ' : p.is_system ? '🏛️ [ORG] ' : '👤 '}
+                    {p.name} — {p.role} ({p.authorized_limit})
+                  </option>
+                );
+              })}
               <option value="">-- No Target (General Deepfake Only) --</option>
             </select>
           </div>
@@ -2054,6 +2333,8 @@ function LiveDashboard({ backendStatus, onRetryBackend }) {
           }}
           enrolledProfiles={enrolledProfiles}
           onDeleteProfile={handleDeleteProfile}
+          auth={auth}
+          initialIsOwnProfile={enrollAsOwnDefault}
         />
 
       </div>
@@ -2150,11 +2431,12 @@ function LiveProbabilityGraph({ history }) {
   );
 }
 
-function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, onDeleteProfile }) {
+function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, onDeleteProfile, auth, initialIsOwnProfile = false }) {
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'record'
   const [name, setName] = useState('');
   const [role, setRole] = useState('Chief Financial Officer');
   const [authorizedLimit, setAuthorizedLimit] = useState('₹ 5,00,00,000');
+  const [isOwnProfile, setIsOwnProfile] = useState(initialIsOwnProfile);
   const [file, setFile] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -2166,6 +2448,15 @@ function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, o
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordTimerRef = useRef(null);
+
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
+    setIsOwnProfile(initialIsOwnProfile);
+    if (initialIsOwnProfile && auth?.isSignedIn && auth?.user?.name) {
+      setName(auth.user.name);
+      setRole('Authorized Operator');
+    }
+  }, [initialIsOwnProfile, auth?.isSignedIn, auth?.user, isOpen]);
 
   const handleCloseModal = () => {
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
@@ -2243,11 +2534,18 @@ function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, o
       formData.append('name', name.trim());
       formData.append('role', role.trim());
       formData.append('authorized_limit', authorizedLimit.trim());
+      if (isOwnProfile && auth?.isSignedIn) {
+        formData.append('is_own_profile', 'true');
+      }
       const fileName = activeTab === 'upload' ? (file.name || 'reference.wav') : 'recorded_sample.wav';
       formData.append('file', audioToUpload, fileName);
 
+      const token = auth?.getToken ? await auth.getToken() : null;
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
       const res = await fetch(`${API_BASE}/api/biometrics/enroll`, {
         method: 'POST',
+        headers,
         body: formData
       });
       const data = await res.json();
@@ -2312,6 +2610,35 @@ function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, o
 
         {/* Enrollment Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Own Profile Toggle for Signed-In Users */}
+          {auth?.isSignedIn && (
+            <div className="p-3 bg-[#0d140b] border border-[#CCFF00]/30 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Fingerprint className="w-4 h-4 text-[#CCFF00] shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-white">Enroll as My Personal Voiceprint</div>
+                  <div className="text-[10px] text-[#888]">
+                    Tags this 128-D vector to your user account (<span className="text-[#CCFF00]">{auth.user?.email || auth.user?.name}</span>).
+                  </div>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isOwnProfile}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setIsOwnProfile(val);
+                    if (val && auth.user?.name && !name) {
+                      setName(auth.user.name);
+                    }
+                  }}
+                  className="w-4 h-4 accent-[#CCFF00] cursor-pointer"
+                />
+              </label>
+            </div>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">Executive Full Name *</label>
@@ -2445,24 +2772,46 @@ function EnrollExecutiveModal({ isOpen, onClose, onEnrolled, enrolledProfiles, o
             </div>
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {enrolledProfiles.map((p) => (
-                <div key={p.speaker_id} className="p-2.5 bg-[#080808] border border-[#1e1e1e] flex items-center justify-between gap-3 text-xs">
-                  <div className="min-w-0">
-                    <div className="font-bold text-white flex items-center gap-2">
-                      <span>{p.name}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#aaa] border border-[#333]">{p.authorized_limit}</span>
+              {enrolledProfiles.map((p) => {
+                const isMine = p.is_own_profile || (auth?.user?.id && p.user_id === auth?.user?.id);
+                return (
+                  <div key={p.speaker_id} className="p-2.5 bg-[#080808] border border-[#1e1e1e] flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                        <span>{p.name}</span>
+                        {isMine && (
+                          <span className="text-[8px] px-1.5 py-0.2 bg-[#CCFF00]/15 text-[#CCFF00] border border-[#CCFF00]/40 uppercase font-bold">
+                            MY PROFILE
+                          </span>
+                        )}
+                        {p.is_system && (
+                          <span className="text-[8px] px-1.5 py-0.2 bg-[#1a1a1a] text-[#888] border border-[#333] uppercase">
+                            SYSTEM
+                          </span>
+                        )}
+                        <span className="text-[9px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#aaa] border border-[#333]">{p.authorized_limit}</span>
+                      </div>
+                      <div className="text-[10px] text-[#666] truncate">{p.role} · {p.enrolled_at}</div>
                     </div>
-                    <div className="text-[10px] text-[#666] truncate">{p.role} · {p.enrolled_at}</div>
+                    {p.is_owner ? (
+                      <button
+                        onClick={() => onDeleteProfile(p.speaker_id)}
+                        className="p-1.5 text-[#666] hover:text-[#FF3333] hover:bg-[#FF3333]/10 border border-transparent hover:border-[#FF3333]/30 transition-colors"
+                        title={`Delete ${p.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <span 
+                        className="p-1.5 text-[#444] cursor-not-allowed" 
+                        title={p.is_system ? "Protected system profile" : "Owned by another operator"}
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={() => onDeleteProfile(p.speaker_id)}
-                    className="p-1.5 text-[#666] hover:text-[#FF3333] hover:bg-[#FF3333]/10 border border-transparent hover:border-[#FF3333]/30 transition-colors"
-                    title={`Delete ${p.name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
