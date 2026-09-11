@@ -61,6 +61,16 @@ class ClerkAuthTests(unittest.TestCase):
         self.assertEqual(data_auth["user"]["email"], "bob@security.corp")
         self.assertFalse(data_auth["has_enrolled_voiceprint"])
 
+    def test_unauthenticated_cannot_enroll(self):
+        import io
+        fake_wav = io.BytesIO(b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80>\x00\x00\x00}\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00")
+        res = self.client.post(
+            "/api/biometrics/enroll",
+            data={"name": "Attacker", "role": "Hacker"},
+            files={"file": ("voice.wav", fake_wav, "audio/wav")}
+        )
+        self.assertEqual(res.status_code, 401)
+
     def test_personal_profile_enrollment_and_isolation(self):
         # Generate dummy 16kHz audio (1 second)
         sr = 16000
@@ -96,12 +106,10 @@ class ClerkAuthTests(unittest.TestCase):
         self.assertTrue(alice_p["is_owner"])
         self.assertTrue(alice_p["is_own_profile"])
 
-        # Check profile listing for User B (Bob should NOT own Alice's profile)
+        # Check profile listing for User B (Bob should NOT see Alice's profile at all)
         user_b_id = "user_clerk_bob"
         profiles_for_bob = biometrics_engine.list_profiles(current_user_id=user_b_id)
-        bob_view_of_alice = next(p for p in profiles_for_bob if p["speaker_id"] == profile_a["speaker_id"])
-        self.assertFalse(bob_view_of_alice["is_owner"])
-        self.assertFalse(bob_view_of_alice["is_own_profile"])
+        self.assertFalse(any(p["speaker_id"] == profile_a["speaker_id"] for p in profiles_for_bob))
 
         # Bob attempts to delete Alice's profile -> raises PermissionError
         with self.assertRaises(PermissionError):
@@ -113,22 +121,34 @@ class ClerkAuthTests(unittest.TestCase):
         self.assertIsNone(biometrics_engine.get_user_profile(user_a_id))
 
     def test_api_cannot_delete_system_profile(self):
-        # Identify a system profile
-        system_profiles = [sid for sid in biometrics_engine.enrolled_speakers.keys() if sid.startswith("cxo_")]
-        self.assertTrue(len(system_profiles) > 0)
-        target_sys_id = system_profiles[0]
+        # Register a protected system profile for testing
+        biometrics_engine.enrolled_speakers["cxo_protected_test"] = {
+            "speaker_id": "cxo_protected_test",
+            "name": "Protected System CXO",
+            "role": "Chief Financial Officer",
+            "authorized_limit": "₹ 5,00,00,000",
+            "voiceprint": [0.1] * 128,
+            "user_id": "system",
+            "enrolled_at": "2026-09-11",
+            "duration_sec": 3.0
+        }
+        target_sys_id = "cxo_protected_test"
 
-        token = jwt.encode(
-            {"sub": "user_hacker", "name": "Attacker"},
-            "test_secret_32_bytes_long_enough_for_hs256!",
-            algorithm="HS256"
-        )
-        res = self.client.delete(
-            f"/api/biometrics/profiles/{target_sys_id}",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        self.assertEqual(res.status_code, 403)
-        self.assertIn("System profile", res.json()["detail"])
+        try:
+            token = jwt.encode(
+                {"sub": "user_hacker", "name": "Attacker"},
+                "test_secret_32_bytes_long_enough_for_hs256!",
+                algorithm="HS256"
+            )
+            res = self.client.delete(
+                f"/api/biometrics/profiles/{target_sys_id}",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            self.assertEqual(res.status_code, 403)
+            self.assertIn("System profile", res.json()["detail"])
+        finally:
+            if "cxo_protected_test" in biometrics_engine.enrolled_speakers:
+                del biometrics_engine.enrolled_speakers["cxo_protected_test"]
 
 
 if __name__ == "__main__":

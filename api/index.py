@@ -351,11 +351,16 @@ async def enroll_biometric_profile(
     from api.detector import load_audio_from_bytes_or_path
     import re
 
+    if not user.is_authenticated:
+        raise HTTPException(status_code=401, detail="Authentication required: Please sign in to enroll voiceprint.")
+
     clean_name = re.sub(r'[^a-zA-Z0-9]+', '_', name.lower()).strip('_')
-    if is_own_profile and user.is_authenticated:
+    if is_own_profile:
         speaker_id = f"user_{user.id}"
     elif not speaker_id or not speaker_id.strip():
-        speaker_id = f"cxo_{clean_name}"
+        speaker_id = f"user_{user.id}_{clean_name}"
+    elif not speaker_id.startswith(f"user_{user.id}"):
+        speaker_id = f"user_{user.id}_{speaker_id}"
 
     audio_bytes = await file.read()
     audio, _, _ = load_audio_from_bytes_or_path(audio_bytes, file.filename)
@@ -365,7 +370,7 @@ async def enroll_biometric_profile(
         role=role,
         audio=audio,
         authorized_limit=authorized_limit,
-        user_id=user.id if user.is_authenticated else None,
+        user_id=user.id,
         user_email=user.email,
         is_own_profile=is_own_profile
     )

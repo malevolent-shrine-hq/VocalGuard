@@ -30,7 +30,6 @@ class SpeakerBiometricsEngine:
         self.storage_path = storage_path or DEFAULT_VAULT_PATH
         self.enrolled_speakers: Dict[str, Dict[str, Any]] = {}
         self._load_vault()
-        self._seed_default_cxo_if_empty()
 
     def extract_voiceprint(self, audio: np.ndarray, sr: int = 16000) -> np.ndarray:
         """
@@ -168,13 +167,16 @@ class SpeakerBiometricsEngine:
         }
 
     def list_profiles(self, current_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Lists enrolled profiles with user ownership tags."""
+        """Lists enrolled profiles belonging strictly to the authenticated user."""
         result = []
+        if not current_user_id or current_user_id in ["guest_anonymous", "guest"]:
+            return []
+
         for speaker_id, p in self.enrolled_speakers.items():
             profile_user_id = p.get("user_id")
-            is_system = bool(not profile_user_id or profile_user_id == "system" or speaker_id.startswith("cxo_"))
-            is_own = bool(p.get("is_own_profile", False) and current_user_id and profile_user_id == current_user_id)
-            is_owner = bool(current_user_id and profile_user_id == current_user_id and not is_system)
+            # Strictly return only profiles belonging to this authenticated user
+            if profile_user_id != current_user_id:
+                continue
 
             result.append({
                 "speaker_id": speaker_id,
@@ -184,9 +186,9 @@ class SpeakerBiometricsEngine:
                 "authorized_limit": p.get("authorized_limit", "₹ 50,00,000"),
                 "enrolled_at": p.get("enrolled_at", "Pre-enrolled"),
                 "duration_sec": p.get("duration_sec", 4.0),
-                "is_owner": is_owner,
-                "is_system": is_system,
-                "is_own_profile": is_own
+                "is_owner": True,
+                "is_system": False,
+                "is_own_profile": bool(p.get("is_own_profile", True))
             })
         return result
 
@@ -200,7 +202,7 @@ class SpeakerBiometricsEngine:
         if is_system:
             raise PermissionError("Protected System profile: Cannot delete organization default executive profile.")
 
-        if current_user_id and profile_user_id != current_user_id:
+        if not current_user_id or profile_user_id != current_user_id:
             raise PermissionError("Unauthorized: You can only delete your own enrolled voiceprint profiles.")
 
         del self.enrolled_speakers[speaker_id]
@@ -233,30 +235,6 @@ class SpeakerBiometricsEngine:
             logger.info(f"Loaded {len(self.enrolled_speakers)} voiceprint profile(s) from vault.")
         except Exception as e:
             logger.warning(f"Could not load voiceprint vault: {e}")
-
-    def _seed_default_cxo_if_empty(self):
-        """Seeds default CXO executive profiles for out-of-the-box demo testing."""
-        if len(self.enrolled_speakers) > 0:
-            return
-
-        # Try to load authentic audio sample for Vikram Sharma
-        sample_path = str(PROJECT_ROOT / "public" / "samples" / "real_human_voice.m4a")
-        if os.path.exists(sample_path):
-            try:
-                from api.detector import load_audio_from_bytes_or_path
-                audio, _, _ = load_audio_from_bytes_or_path(sample_path)
-                # Enroll first 2.5 seconds as Vikram Sharma's golden voiceprint
-                cxo_audio = audio[:int(16000 * 2.5)]
-                self.enroll_speaker(
-                    speaker_id="cxo_vikram_sharma",
-                    name="Vikram Sharma",
-                    role="Chief Financial Officer (Global Treasury)",
-                    audio=cxo_audio,
-                    authorized_limit="₹ 5,00,00,000"
-                )
-                logger.info("Successfully seeded default profile: Vikram Sharma (CFO)")
-            except Exception as e:
-                logger.warning(f"Could not seed default CXO profile: {e}")
 
 
 # Global Biometrics Singleton
